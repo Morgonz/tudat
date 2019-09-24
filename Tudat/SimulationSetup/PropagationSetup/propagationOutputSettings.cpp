@@ -24,11 +24,15 @@ std::string getVariableName( const VariableType variableType )
     case independentVariable:
         return "Independent variable ";
     case cpuTimeVariable:
-        return "Cummulative computation time variable ";
+        return "Cumulative computation time variable ";
     case stateVariable:
         return "Integrated state ";
     case dependentVariable:
         return "Dependent variable ";
+    case stateTransitionMatrix:
+        return "State transition matrix ";
+    case sensitivityMatrix:
+        return "Sensitivity matrix ";
     default:
         throw std::runtime_error( "Error, variable " +
                                   std::to_string( variableType ) +
@@ -37,10 +41,10 @@ std::string getVariableName( const VariableType variableType )
 }
 
 //! Function to get a string representing a 'named identification' of a variable
-std::string getVariableId( const boost::shared_ptr< VariableSettings > variableSettings )
+std::string getVariableId( const std::shared_ptr< VariableSettings > variableSettings )
 {
-    boost::shared_ptr< SingleDependentVariableSaveSettings > singleDependentVariableSaveSettings =
-            boost::dynamic_pointer_cast< SingleDependentVariableSaveSettings >( variableSettings );
+    std::shared_ptr< SingleDependentVariableSaveSettings > singleDependentVariableSaveSettings =
+            std::dynamic_pointer_cast< SingleDependentVariableSaveSettings >( variableSettings );
     if ( singleDependentVariableSaveSettings )
     {
         return getDependentVariableId( singleDependentVariableSaveSettings );
@@ -127,6 +131,12 @@ std::string getDependentVariableName( const PropagationDependentVariables propag
     case local_temperature_dependent_variable:
         variableName = "Local freestream temperature ";
         break;
+    case local_dynamic_pressure_dependent_variable:
+        variableName = "Local dynamic pressure ";
+        break;
+    case local_aerodynamic_heat_rate_dependent_variable:
+        variableName = "Local aerodynamic heat rate ";
+        break;
     case geodetic_latitude_dependent_variable:
         variableName = "Geodetic latitude ";
         break;
@@ -160,6 +170,36 @@ std::string getDependentVariableName( const PropagationDependentVariables propag
     case modified_equinocial_state_dependent_variable:
         variableName = "Modified equinoctial elements ";
         break;
+    case spherical_harmonic_acceleration_terms_dependent_variable:
+        variableName = "Spherical harmonic acceleration terms ";
+        break;
+    case body_fixed_relative_cartesian_position:
+        variableName = "Body-fixed relative Cartesian position ";
+        break;
+    case body_fixed_relative_spherical_position:
+        variableName = "Body-fixed relative spherical position ";
+        break;
+    case euler_angles_to_body_fixed_313:
+        variableName = "313 Euler angles to body-fixed frame ";
+        break;
+    case total_gravity_field_variation_acceleration:
+        variableName = "Total time-variable gravity field acceleration correction ";
+        break;
+    case single_gravity_field_variation_acceleration:
+        variableName = "Single-source time-variable gravity field acceleration correction ";
+        break;
+    case single_gravity_field_variation_acceleration_terms:
+        variableName = "Single-source time-variable gravity field per-term acceleration correction ";
+        break;
+    case acceleration_partial_wrt_body_translational_state:
+        variableName = "Acceleration partial w.r.t body state ";
+        break;
+    case current_body_mass_dependent_variable:
+        variableName = "Current body mass ";
+        break;
+    case radiation_pressure_coefficient_dependent_variable:
+        variableName = "Radiation pressure coefficient ";
+        break;
     default:
         std::string errorMessage = "Error, dependent variable " +
                 std::to_string( propagationDependentVariables ) +
@@ -172,45 +212,45 @@ std::string getDependentVariableName( const PropagationDependentVariables propag
 
 //! Function to get a string representing a 'named identification' of a dependent variable
 std::string getDependentVariableId(
-        const boost::shared_ptr< SingleDependentVariableSaveSettings > dependentVariableSettings )
+        const std::shared_ptr< SingleDependentVariableSaveSettings > dependentVariableSettings )
 {
     std::string variableId = getDependentVariableName( dependentVariableSettings->dependentVariableType_ );
 
     if( ( dependentVariableSettings->dependentVariableType_ == single_acceleration_dependent_variable ) ||
             ( dependentVariableSettings->dependentVariableType_ == single_acceleration_norm_dependent_variable ) )
     {
-        boost::shared_ptr< SingleAccelerationDependentVariableSaveSettings > accelerationDependentVariableSettings =
-                boost::dynamic_pointer_cast< SingleAccelerationDependentVariableSaveSettings >( dependentVariableSettings );
-        if( accelerationDependentVariableSettings == NULL )
+        std::shared_ptr< SingleAccelerationDependentVariableSaveSettings > accelerationDependentVariableSettings =
+                std::dynamic_pointer_cast< SingleAccelerationDependentVariableSaveSettings >( dependentVariableSettings );
+        if( accelerationDependentVariableSettings == nullptr )
         {
             throw std::runtime_error( "Error when getting dependent variable ID, input is inconsistent (acceleration type )" );
         }
         else
         {
             variableId += basic_astrodynamics::getAccelerationModelName(
-                        accelerationDependentVariableSettings->accelerationModeType_ );
+                        accelerationDependentVariableSettings->accelerationModelType_ );
         }
     }
     else if( ( dependentVariableSettings->dependentVariableType_ == single_torque_dependent_variable ) ||
              ( dependentVariableSettings->dependentVariableType_ == single_torque_norm_dependent_variable ) )
     {
-        boost::shared_ptr< SingleTorqueDependentVariableSaveSettings > torqueDependentVariableSettings =
-                boost::dynamic_pointer_cast< SingleTorqueDependentVariableSaveSettings >( dependentVariableSettings );
-        if( torqueDependentVariableSettings == NULL )
+        std::shared_ptr< SingleTorqueDependentVariableSaveSettings > torqueDependentVariableSettings =
+                std::dynamic_pointer_cast< SingleTorqueDependentVariableSaveSettings >( dependentVariableSettings );
+        if( torqueDependentVariableSettings == nullptr )
         {
             throw std::runtime_error( "Error when getting dependent variable ID, input is inconsistent (torque type )" );
         }
         else
         {
             variableId += basic_astrodynamics::getTorqueModelName(
-                        torqueDependentVariableSettings->torqueModeType_ );
+                        torqueDependentVariableSettings->torqueModelType_ );
         }
     }
     else if( dependentVariableSettings->dependentVariableType_ == intermediate_aerodynamic_rotation_matrix_variable )
     {
-        boost::shared_ptr< IntermediateAerodynamicRotationVariableSaveSettings > rotationDependentVariableSettings =
-                boost::dynamic_pointer_cast< IntermediateAerodynamicRotationVariableSaveSettings >( dependentVariableSettings );
-        if( rotationDependentVariableSettings == NULL )
+        std::shared_ptr< IntermediateAerodynamicRotationVariableSaveSettings > rotationDependentVariableSettings =
+                std::dynamic_pointer_cast< IntermediateAerodynamicRotationVariableSaveSettings >( dependentVariableSettings );
+        if( rotationDependentVariableSettings == nullptr )
         {
             throw std::runtime_error( "Error when getting dependent variable ID, input is inconsistent (rotation matrix)" );
         }
@@ -224,9 +264,9 @@ std::string getDependentVariableId(
 
     else if( dependentVariableSettings->dependentVariableType_ == relative_body_aerodynamic_orientation_angle_variable )
     {
-        boost::shared_ptr< BodyAerodynamicAngleVariableSaveSettings > angleDependentVariableSettings =
-                boost::dynamic_pointer_cast< BodyAerodynamicAngleVariableSaveSettings >( dependentVariableSettings );
-        if( angleDependentVariableSettings == NULL )
+        std::shared_ptr< BodyAerodynamicAngleVariableSaveSettings > angleDependentVariableSettings =
+                std::dynamic_pointer_cast< BodyAerodynamicAngleVariableSaveSettings >( dependentVariableSettings );
+        if( angleDependentVariableSettings == nullptr )
         {
             throw std::runtime_error( "Error when getting dependent variable ID, input is inconsistent (angle)" );
         }
@@ -238,7 +278,8 @@ std::string getDependentVariableId(
     }
 
     if( ( dependentVariableSettings->dependentVariableType_ == single_acceleration_dependent_variable ) ||
-            ( dependentVariableSettings->dependentVariableType_ == single_acceleration_norm_dependent_variable )  )
+            ( dependentVariableSettings->dependentVariableType_ == single_acceleration_norm_dependent_variable ) ||
+            ( dependentVariableSettings->dependentVariableType_ == spherical_harmonic_acceleration_terms_dependent_variable ) )
     {
         variableId += ", acting on " + dependentVariableSettings->associatedBody_;
         if( dependentVariableSettings->secondaryBody_ != dependentVariableSettings->associatedBody_ )

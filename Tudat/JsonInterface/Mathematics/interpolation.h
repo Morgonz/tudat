@@ -21,10 +21,10 @@ namespace tudat
 namespace interpolators
 {
 
-// OneDimensionalInterpolatorTypes
+// InterpolatorTypes
 
-//! Map of `OneDimensionalInterpolatorTypes` string representations.
-static std::map< OneDimensionalInterpolatorTypes, std::string > oneDimensionalInterpolatorTypes =
+//! Map of `InterpolatorTypes` string representations.
+static std::map< InterpolatorTypes, std::string > oneDimensionalInterpolatorTypes =
 {
     { linear_interpolator, "linear" },
     { cubic_spline_interpolator, "cubicSpline" },
@@ -33,17 +33,17 @@ static std::map< OneDimensionalInterpolatorTypes, std::string > oneDimensionalIn
     { piecewise_constant_interpolator, "piecewiseConstant" }
 };
 
-//! `OneDimensionalInterpolatorTypes` not supported by `json_interface`.
-static std::vector< OneDimensionalInterpolatorTypes > unsupportedOneDimensionalInterpolatorTypes = { };
+//! `InterpolatorTypes` not supported by `json_interface`.
+static std::vector< InterpolatorTypes > unsupportedOneDimensionalInterpolatorTypes = { };
 
-//! Convert `OneDimensionalInterpolatorTypes` to `json`.
-inline void to_json( nlohmann::json& jsonObject, const OneDimensionalInterpolatorTypes& oneDimensionalInterpolatorType )
+//! Convert `InterpolatorTypes` to `json`.
+inline void to_json( nlohmann::json& jsonObject, const InterpolatorTypes& oneDimensionalInterpolatorType )
 {
     jsonObject = json_interface::stringFromEnum( oneDimensionalInterpolatorType, oneDimensionalInterpolatorTypes );
 }
 
-//! Convert `json` to `OneDimensionalInterpolatorTypes`.
-inline void from_json( const nlohmann::json& jsonObject, OneDimensionalInterpolatorTypes& oneDimensionalInterpolatorType )
+//! Convert `json` to `InterpolatorTypes`.
+inline void from_json( const nlohmann::json& jsonObject, InterpolatorTypes& oneDimensionalInterpolatorType )
 {
     oneDimensionalInterpolatorType =
             json_interface::enumFromString( jsonObject, oneDimensionalInterpolatorTypes );
@@ -72,6 +72,35 @@ inline void to_json( nlohmann::json& jsonObject, const AvailableLookupScheme& av
 inline void from_json( const nlohmann::json& jsonObject, AvailableLookupScheme& availableLookupScheme )
 {
     availableLookupScheme = json_interface::enumFromString( jsonObject, lookupSchemeTypes );
+}
+
+
+// BoundaryHandling
+
+//! Map of `AvailableLookupScheme`s string representations.
+static std::map< BoundaryInterpolationType, std::string > boundaryInterpolationTypes =
+{
+    { throw_exception_at_boundary, "throwException" },
+    { use_boundary_value, "boundaryValue" },
+    { use_boundary_value_with_warning, "boundaryValueWithWarning" },
+    { extrapolate_at_boundary, "extrapolate" },
+    { extrapolate_at_boundary_with_warning, "extrapolateWithWarning" }
+};
+
+//! `BoundaryInterpolationType`s not supported by `json_interface`.
+static std::vector< BoundaryInterpolationType > unsupportedBoundaryInterpolationTypes =
+{ use_default_value, use_default_value_with_warning };
+
+//! Convert `BoundaryInterpolationType` to `json`.
+inline void to_json( nlohmann::json& jsonObject, const BoundaryInterpolationType& boundaryHandling )
+{
+    jsonObject = json_interface::stringFromEnum( boundaryHandling, boundaryInterpolationTypes );
+}
+
+//! Convert `json` to `BoundaryInterpolationType`.
+inline void from_json( const nlohmann::json& jsonObject, BoundaryInterpolationType& boundaryHandling )
+{
+    boundaryHandling = json_interface::enumFromString( jsonObject, boundaryInterpolationTypes );
 }
 
 
@@ -108,7 +137,7 @@ inline void from_json( const nlohmann::json& jsonObject,
 
 //! Create a `json` object from a shared pointer to a `DataMapSettings` object.
 template< typename I, typename D >
-void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< DataMapSettings< I, D > >& dataMapSettings )
+void to_json( nlohmann::json& jsonObject, const std::shared_ptr< DataMapSettings< I, D > >& dataMapSettings )
 {
     if ( ! dataMapSettings )
     {
@@ -117,8 +146,8 @@ void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< DataMapSettin
     using namespace json_interface;
     using K = Keys::Interpolation::DataMap;
 
-    boost::shared_ptr< HermiteDataSettings< I, D > > hermiteDataSettings =
-            boost::dynamic_pointer_cast< HermiteDataSettings< I, D > >( dataMapSettings );
+    std::shared_ptr< HermiteDataSettings< I, D > > hermiteDataSettings =
+            std::dynamic_pointer_cast< HermiteDataSettings< I, D > >( dataMapSettings );
     if ( hermiteDataSettings )
     {
         jsonObject[ K::map ] = hermiteDataSettings->getDataMap( );
@@ -127,16 +156,16 @@ void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< DataMapSettin
         return;
     }
 
-    boost::shared_ptr< FromFileDataMapSettings< D > > fromFileDataMapSettings =
-            boost::dynamic_pointer_cast< FromFileDataMapSettings< D > >( dataMapSettings );
+    std::shared_ptr< FromFileDataMapSettings< D > > fromFileDataMapSettings =
+            std::dynamic_pointer_cast< FromFileDataMapSettings< D > >( dataMapSettings );
     if ( fromFileDataMapSettings )
     {
         jsonObject[ K::file ] = boost::filesystem::path( fromFileDataMapSettings->relativeFilePath_ );
         return;
     }
 
-    boost::shared_ptr< IndependentDependentDataMapSettings< I, D > > independentDependentDataMapSettings =
-            boost::dynamic_pointer_cast< IndependentDependentDataMapSettings< I, D > >( dataMapSettings );
+    std::shared_ptr< IndependentDependentDataMapSettings< I, D > > independentDependentDataMapSettings =
+            std::dynamic_pointer_cast< IndependentDependentDataMapSettings< I, D > >( dataMapSettings );
     if ( independentDependentDataMapSettings )
     {
         jsonObject[ K::independentVariableValues ] = independentDependentDataMapSettings->independentVariableValues_;
@@ -149,14 +178,14 @@ void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< DataMapSettin
 
 //! Create a shared pointer to a `DataMapSettings` object from a `json` object.
 template< typename I, typename D >
-void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< DataMapSettings< I, D > >& dataMapSettings )
+void from_json( const nlohmann::json& jsonObject, std::shared_ptr< DataMapSettings< I, D > >& dataMapSettings )
 {
     using namespace json_interface;
     using K = Keys::Interpolation::DataMap;
 
     if ( isDefined( jsonObject, K::dependentVariableFirstDerivativeValues ) )
     {
-        dataMapSettings = boost::make_shared< HermiteDataSettings< I, D > >(
+        dataMapSettings = std::make_shared< HermiteDataSettings< I, D > >(
                     getValue< std::map< I, D > >( jsonObject, K::map ),
                     getValue< std::vector< D > >( jsonObject, K::dependentVariableFirstDerivativeValues ) );
         return;
@@ -164,20 +193,20 @@ void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< DataMapSett
 
     if ( isDefined( jsonObject, K::file ) )
     {
-        dataMapSettings = boost::make_shared< FromFileDataMapSettings< D > >(
+        dataMapSettings = std::make_shared< FromFileDataMapSettings< D > >(
                     getValue< boost::filesystem::path >( jsonObject, K::file ).string( ) );
         return;
     }
 
     if ( isDefined( jsonObject, K::independentVariableValues ) || isDefined( jsonObject, K::dependentVariableValues ) )
     {
-        dataMapSettings = boost::make_shared< IndependentDependentDataMapSettings< I, D > >(
+        dataMapSettings = std::make_shared< IndependentDependentDataMapSettings< I, D > >(
                     getValue< std::vector< I > >( jsonObject, K::independentVariableValues ),
                     getValue< std::vector< D > >( jsonObject, K::dependentVariableValues ) );
         return;
     }
 
-    dataMapSettings = boost::make_shared< DataMapSettings< I, D > >(
+    dataMapSettings = std::make_shared< DataMapSettings< I, D > >(
                 getValue< std::map< I, D > >( jsonObject, K::map ) );
     return;
 }
@@ -186,10 +215,10 @@ void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< DataMapSett
 // InterpolatorSettings
 
 //! Create a `json` object from a shared pointer to a `InterpolatorSettings` object.
-void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< InterpolatorSettings >& interpolatorSettings );
+void to_json( nlohmann::json& jsonObject, const std::shared_ptr< InterpolatorSettings >& interpolatorSettings );
 
 //! Create a shared pointer to a `InterpolatorSettings` object from a `json` object.
-void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< InterpolatorSettings >& interpolatorSettings );
+void from_json( const nlohmann::json& jsonObject, std::shared_ptr< InterpolatorSettings >& interpolatorSettings );
 
 
 // DataInterpolationSettings
@@ -197,7 +226,7 @@ void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< Interpolato
 //! Create a `json` object from a shared pointer to a `DataInterpolationSettings` object.
 template< typename I, typename D >
 void to_json( nlohmann::json& jsonObject,
-              const boost::shared_ptr< DataInterpolationSettings< I, D > >& dataInterpolationSettings )
+              const std::shared_ptr< DataInterpolationSettings< I, D > >& dataInterpolationSettings )
 {
     if ( ! dataInterpolationSettings )
     {
@@ -213,14 +242,14 @@ void to_json( nlohmann::json& jsonObject,
 //! Create a shared pointer to a `DataInterpolationSettings` object from a `json` object.
 template< typename I, typename D >
 void from_json( const nlohmann::json& jsonObject,
-                boost::shared_ptr< DataInterpolationSettings< I, D > >& dataInterpolationSettings )
+                std::shared_ptr< DataInterpolationSettings< I, D > >& dataInterpolationSettings )
 {
     using namespace json_interface;
     using K = Keys::Interpolation::DataInterpolation;
 
-    dataInterpolationSettings = boost::make_shared< DataInterpolationSettings< I, D > >(
-                getValue< boost::shared_ptr< DataMapSettings< I, D > > >( jsonObject, K::data ),
-                getValue< boost::shared_ptr< InterpolatorSettings > >( jsonObject, K::interpolator ) );
+    dataInterpolationSettings = std::make_shared< DataInterpolationSettings< I, D > >(
+                getValue< std::shared_ptr< DataMapSettings< I, D > > >( jsonObject, K::data ),
+                getValue< std::shared_ptr< InterpolatorSettings > >( jsonObject, K::interpolator ) );
 }
 
 } // namespace interpolators
@@ -232,10 +261,10 @@ namespace simulation_setup
 // ModelInterpolationSettings
 
 //! Create a `json` object from a shared pointer to a `ModelInterpolationSettings` object.
-void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< ModelInterpolationSettings >& modelInterpolationSettings );
+void to_json( nlohmann::json& jsonObject, const std::shared_ptr< ModelInterpolationSettings >& modelInterpolationSettings );
 
 //! Create a shared pointer to a `ModelInterpolationSettings` object from a `json` object.
-void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< ModelInterpolationSettings >& modelInterpolationSettings );
+void from_json( const nlohmann::json& jsonObject, std::shared_ptr< ModelInterpolationSettings >& modelInterpolationSettings );
 
 } // namespace simulation_setup
 

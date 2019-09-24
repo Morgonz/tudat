@@ -11,10 +11,12 @@
 #ifndef TUDAT_EQUILIBRIUMWALLTEMPERATURE_H
 #define TUDAT_EQUILIBRIUMWALLTEMPERATURE_H
 
+#include <functional>
 
 #include "Tudat/Mathematics/BasicMathematics/basicFunction.h"
 #include "Tudat/Astrodynamics/BasicAstrodynamics/physicalConstants.h"
 #include "Tudat/Astrodynamics/ElectroMagnetism/basicElectroMagnetism.h"
+
 namespace tudat
 {
 
@@ -33,12 +35,11 @@ public:
      * \param adiabaticWallTemperature Adiabatic wall temperature
      */
     EquilibriumTemperatureFunction(
-            const boost::function< double( const double ) > heatTransferFunction,
+            const std::function< double( const double ) > heatTransferFunction,
             const double wallEmissivity,
             double adiabaticWallTemperature ):
        heatTransferFunction_( heatTransferFunction ), wallEmissivity_( wallEmissivity ),
        adiabaticWallTemperature_( adiabaticWallTemperature ){ }
-
 
     //! Destructor.
     ~EquilibriumTemperatureFunction(){}
@@ -82,7 +83,7 @@ protected:
 
 private:
     //! Function that returns the heat input as a function of wall temperature.
-    boost::function< double( const double ) > heatTransferFunction_;
+    std::function< double( const double ) > heatTransferFunction_;
 
     //! Constant wall emissivity.
     const double wallEmissivity_;
@@ -102,7 +103,7 @@ private:
  * \return Wall temperature at which input and output of heat are in equilibrium.
  */
 double computeEquilibiumWallTemperature(
-        const boost::function< double( const double ) > heatTransferFunction,
+        const std::function< double( const double ) > heatTransferFunction,
         const double wallEmmisivity,
         const double adiabaticWallTemperature );
 

@@ -11,8 +11,15 @@
 # Add source files.
 set(NUMERICALINTEGRATORS_SOURCES
   "${SRCROOT}${NUMERICALINTEGRATORSDIR}/rungeKuttaCoefficients.cpp"
+  "${SRCROOT}${NUMERICALINTEGRATORSDIR}/createNumericalIntegrator.cpp"
   "${SRCROOT}${NUMERICALINTEGRATORSDIR}/bulirschStoerVariableStepsizeIntegrator.cpp"
   "${SRCROOT}${NUMERICALINTEGRATORSDIR}/UnitTests/numericalIntegratorTests.cpp"
+  "${SRCROOT}${NUMERICALINTEGRATORSDIR}/numericalIntegrator.cpp"
+  "${SRCROOT}${NUMERICALINTEGRATORSDIR}/reinitializableNumericalIntegrator.cpp"
+  "${SRCROOT}${NUMERICALINTEGRATORSDIR}/rungeKutta4Integrator.cpp"
+  "${SRCROOT}${NUMERICALINTEGRATORSDIR}/rungeKuttaVariableStepSizeIntegrator.cpp"
+  "${SRCROOT}${NUMERICALINTEGRATORSDIR}/adamsBashforthMoultonIntegrator.cpp"
+  "${SRCROOT}${NUMERICALINTEGRATORSDIR}/bulirschStoerVariableStepsizeIntegrator.cpp"
 )
 
 # Add header files.

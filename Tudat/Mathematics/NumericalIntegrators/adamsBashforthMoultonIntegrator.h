@@ -1,4 +1,4 @@
-/*    Copyright (c) 2010-2017, Delft University of Technology
+/*    Copyright (c) 2010-2018, Delft University of Technology
  *    All rigths reserved
  *
  *    This file is part of the Tudat. Redistribution and use in source and
@@ -25,7 +25,7 @@
 #include <algorithm>
 #include <limits>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
@@ -50,8 +50,8 @@ namespace numerical_integrators
  * \tparam IndependentVariableType The type of the independent variable.
  * \sa NumericalIntegrator.
  */
-template < typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
-           typename StateDerivativeType = Eigen::VectorXd, typename TimeStepType = IndependentVariableType >
+template< typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
+          typename StateDerivativeType = Eigen::VectorXd, typename TimeStepType = IndependentVariableType >
 class AdamsBashforthMoultonIntegrator
         : public ReinitializableNumericalIntegrator<
         IndependentVariableType, StateType, StateDerivativeType, TimeStepType >
@@ -165,6 +165,8 @@ public:
               StateType::Constant( initialState.rows( ), initialState.cols( ), std::fabs( absoluteErrorTolerance ) ),
               bandwidth ) { }
     
+    ~AdamsBashforthMoultonIntegrator( ){ }
+
     //! Get step size of the next step.
     /*!
      * Returns the step size of the next step. If the
@@ -217,14 +219,17 @@ public:
     virtual StateType performIntegrationStep( const TimeStepType stepSize )
     {
         // If stepSize is not same as old, clear the step-size dependent histories.
-        if ( stepSize != stepSize_ ){
+        if ( stepSize != stepSize_ )
+        {
             // Pop all values from the history deque (the history is
             // invalid as it is dependent on the stepSize), except for
             // the current state and state derivative.
-            while ( stateHistory_.size( ) > 1 ) {
+            while ( stateHistory_.size( ) > 1 )
+            {
                 stateHistory_.pop_back( );
             }
-            while ( derivHistory_.size( ) > 1 ) {
+            while ( derivHistory_.size( ) > 1 )
+            {
                 derivHistory_.pop_back( );
             }
             stepSize_ = stepSize;
@@ -251,10 +256,12 @@ public:
 
         // Remove old elements so enough are left to calculate predicted and corrected.
         // max twice the order, to facilitatie a doubling, halving, and order change.
-        while ( stateHistory_.size( ) > order_ * 2 ) {
+        while ( stateHistory_.size( ) > order_ * 2 )
+        {
             stateHistory_.pop_back( );
         }
-        while ( derivHistory_.size( ) > order_ * 2 ) {
+        while ( derivHistory_.size( ) > order_ * 2 )
+        {
             derivHistory_.pop_back( );
         }
         unsigned int sizeStateHistory = stateHistory_.size( );
@@ -266,9 +273,12 @@ public:
 
         // Check if enough history steps are available to perform AM
         // step if not use a single-step method.
-        if ( possibleOrder < minimumOrder_ || possibleOrder < order_ ){
+        if ( possibleOrder < minimumOrder_ || possibleOrder < order_ )
+        {
             correctedState = performSingleStep( );
-        } else {
+        }
+        else
+        {
             StateType predictedState = performPredictorStep( order_, false );
             predictedDerivative_ = this->stateDerivativeFunction_( currentIndependentVariable_ +
                                                                    stepSize_, predictedState );
@@ -285,7 +295,8 @@ public:
         // If order is not fixed, order is not max yet and enough
         // history is available, then predict the error of an order
         // more.
-        if ( !fixedOrder_ && order_ < maximumOrder_ && order_ < possibleOrder ) {
+        if ( !fixedOrder_ && order_ < maximumOrder_ && order_ < possibleOrder )
+        {
             predictedState = performPredictorStep( order_ + 1, false );
             correctedState = performCorrectorStep( predictedState, order_ + 1, false );
             predictorAbsoluteError = estimateAbsoluteError( predictedState, correctedState, order_ + 1 );
@@ -293,26 +304,32 @@ public:
 
             // If the predicted error is less than the current error,
             // increase the error.
-            if ( errorCompare( predictorAbsoluteError, predictorRelativeError, absoluteError_, relativeError_ ) ){
+            if ( errorCompare( predictorAbsoluteError, predictorRelativeError, absoluteError_, relativeError_ ) )
+            {
                 
                 order_++;
             }
             // Else if the order is not fixed, the order is not min yet
             // and there is enough history available, then predict the
             // error of an order less.
-        } else if ( !fixedOrder_ && order_ > minimumOrder_ && order_ - 1 <= possibleOrder ) {
+        }
+        else if ( !fixedOrder_ && order_ > minimumOrder_ && order_ - 1 <= possibleOrder )
+        {
             predictedState = performPredictorStep( order_ - 1, false );
             correctedState = performCorrectorStep( predictedState, order_ - 1, false );
             predictorAbsoluteError = estimateAbsoluteError( predictedState, correctedState, order_ - 1 );
             predictorRelativeError = estimateRelativeError( predictedState, correctedState, predictorAbsoluteError );
             // If it is less than the current order, lower the order.
-            if ( errorCompare( predictorAbsoluteError, predictorRelativeError, absoluteError_, relativeError_ ) ){
+            if ( errorCompare( predictorAbsoluteError, predictorRelativeError, absoluteError_, relativeError_ ) )
+            {
                 order_--;
             } else {
                 predictorAbsoluteError = absoluteError_;
                 predictorRelativeError = relativeError_;
             }
-        } else {
+        }
+        else
+        {
             predictorAbsoluteError = absoluteError_;
             predictorRelativeError = relativeError_;
         }
@@ -321,8 +338,8 @@ public:
         // isn't fixed and will not become too small, then halve the
         // stepsize.
         if ( errorTooLarge( predictorAbsoluteError, predictorRelativeError )
-             && std::fabs( stepSize_ / 2.0 )> minimumStepSize_ && !fixedStepSize_ ) {
-
+             && std::fabs( stepSize_ / 2.0 )> minimumStepSize_ && !fixedStepSize_ )
+        {
             // Set up new data for halving
             std::deque< StateType > tempStateHistory;
             std::deque< StateType > tempDerivativeHistory;
@@ -339,13 +356,16 @@ public:
             
             // FIXME: make this a setting?
             // Reduce order. Too much backlog aversly affects the accuracy when halving.
-            if( order_ > minimumOrder_ ){
+            if( order_ > minimumOrder_ )
+            {
                 order_ = minimumOrder_;
             }
             
-            for( unsigned int i = 0; i < possibleHalvingOrder ; i++ ){
+            for( unsigned int i = 0; i < possibleHalvingOrder ; i++ )
+            {
                 // If states are even, they already exist, no need to interpolate
-                if ( i % 2 == 0 ){
+                if ( i % 2 == 0 )
+                {
                     tempStateHistory.push_back( stateHistory_.at( i / 2 ));
                     tempDerivativeHistory.push_back( derivHistory_.at( i / 2 ));
                 } else {
@@ -354,7 +374,8 @@ public:
                     midDerivative = midState;
                     interpolationDerivativeIndex = ( order_ - 1 ) * ( order_ - 1 ) + ( i - 1 ) / 2;
                     interpolationStateIndex = interpolationDerivativeIndex - order_ + 1;
-                    for( unsigned int j = 0; j < order_; j++ ){
+                    for( unsigned int j = 0; j < order_; j++ )
+                    {
                         midState += interpolationCoefficients[ interpolationStateIndex ][ j ] *
                                 stateHistory_.at( j ) + interpolationCoefficients[ interpolationStateIndex ][ order_ + j ] *
                                 derivHistory_.at( j ) * stepSize_;
@@ -385,7 +406,8 @@ public:
         // then double the stepsize.
         if ( errorTooSmall( predictorAbsoluteError, predictorRelativeError )
              && sizeDerivativeHistory >= 2 * order_
-             && std::fabs( stepSize_ * 2.0 ) <= maximumStepSize_ && !fixedStepSize_ ) {
+             && std::fabs( stepSize_ * 2.0 ) <= maximumStepSize_ && !fixedStepSize_ )
+        {
             
             // Predict error after doubling, to prevent error from becoming too big
             // This prevents fluttering and throwing away states from the history that will be
@@ -405,17 +427,20 @@ public:
                                                             predictorAbsoluteError );
 
             // Only update the history if the error will not be too large
-            if ( !errorTooLarge( predictorAbsoluteError, predictorRelativeError ) ) {
+            if ( !errorTooLarge( predictorAbsoluteError, predictorRelativeError ) )
+            {
                 // Note that the history should be at least 7 to allow successful
                 // continuation of the AM scheme.
                 std::deque< StateType > tempStateHistory;
                 std::deque< StateType > tempDerivativeHistory;
                 
                 // Use old history to fill new history, skipping every other entry starting at 1
-                for( unsigned int i = 1; i < sizeStateHistory; i += 2 ) {
+                for( unsigned int i = 1; i < sizeStateHistory; i += 2 )
+                {
                     tempStateHistory.push_back( stateHistory_.at( i ));
                 }
-                for( unsigned int i = 1; i < sizeDerivativeHistory; i += 2 ){
+                for( unsigned int i = 1; i < sizeDerivativeHistory; i += 2 )
+                {
                     tempDerivativeHistory.push_back( derivHistory_.at( i ));
                 }
                 
@@ -433,7 +458,6 @@ public:
         derivHistory_.push_front( this->stateDerivativeFunction_(
                                       currentIndependentVariable_, currentState_ ) );
         return currentState_;
-
     }
 
     //! Rollback internal state to the last state.
@@ -446,7 +470,8 @@ public:
      */
     virtual bool rollbackToPreviousState( )
     {
-        if ( currentIndependentVariable_ == lastIndependentVariable_ ) {
+        if ( currentIndependentVariable_ == lastIndependentVariable_ )
+        {
             return false;
         }
         currentIndependentVariable_ = lastIndependentVariable_;
@@ -464,23 +489,29 @@ public:
         return true;
     }
 
-    //! Modify the state at the current value of the independent variable.
+    //! Replace the state with a new value.
     /*!
-     * Modify the state at the current value of the independent variable.
-     * \param newState The new state to set the current state to.
+     * Replace the state with a new value. This allows for discrete jumps in the state, often
+     * used in simulations of discrete events. In astrodynamics, this relates to simulations of rocket staging,
+     * impulsive shots, parachuting, ideal control, etc. The modified state, by default, cannot be rolled back; to do this, either
+     * set the flag to true, or store the state before calling this function the first time, and call it again with the initial state
+     * as parameter to revert to the state before the discrete change.
+     * \param newState The value of the new state.
+     * \param allowRollback Boolean denoting whether roll-back should be allowed.
      */
-    void modifyCurrentState( const StateType& newState )
+    void modifyCurrentState( const StateType& newState, const bool allowRollback = false )
     {
         currentState_ = newState;
 
         // Clear the history and initiate with new state and derivative.
-        stateHistory_.clear( );
-        derivHistory_.clear( );
-        stateHistory_.push_front( currentState_ );
-        derivHistory_.push_front( this->stateDerivativeFunction_(
-                                      currentIndependentVariable_, currentState_ ) );
-        lastIndependentVariable_ = currentIndependentVariable_;
-        
+        stateHistory_[ 0 ] = currentState_;
+        derivHistory_[ 0 ] = this->stateDerivativeFunction_(
+                    currentIndependentVariable_, currentState_ );
+        if ( !allowRollback )
+        {
+            lastIndependentVariable_ = currentIndependentVariable_;
+        }
+
         // Allow single step integrator to determine own stepsize
         fixedSingleStep_ = fixedStepSize_;
     }
@@ -549,7 +580,8 @@ public:
      * \param minimumStepSize minimum stepsize
      * \param maximumStepSize maximum stepsize
      */
-    void setStepSizeBounds( IndependentVariableType minimumStepSize, IndependentVariableType maximumStepSize ) {
+    void setStepSizeBounds( IndependentVariableType minimumStepSize, IndependentVariableType maximumStepSize )
+    {
         minimumStepSize_ = minimumStepSize;
         maximumStepSize_ = maximumStepSize;
     }
@@ -560,7 +592,8 @@ public:
      * \param absoluteErrorTolerance absolute error tolerance.
      * \param relativeErrorTolerance relative error tolerance.
      */
-    void setErrorTolerances( StateType& absoluteErrorTolerance, StateType& relativeErrorTolerance ) {
+    void setErrorTolerances( StateType& absoluteErrorTolerance, StateType& relativeErrorTolerance )
+    {
         absoluteErrorTolerance_ = absoluteErrorTolerance;
         relativeErrorTolerance_ = relativeErrorTolerance;
     }
@@ -751,7 +784,7 @@ protected:
      */
     StateType performSingleStep( )
     {
-        typename StateType::Scalar maximumTolerance = std::numeric_limits< typename StateType::Scalar >::infinity( );
+        typename StateType::Scalar maximumTolerance = 1.0;
         
         // FIXME: define these integrators in the private scope of class and initialize in constructor.
         // Perhaps with an user-selectable RK variant. The modifyCurrentState statements below should
@@ -772,13 +805,16 @@ protected:
                     minimumStepSize_, maximumStepSize_, relativeErrorTolerance_, absoluteErrorTolerance_ );
         
         StateType currentState;
-        if( fixedSingleStep_ ) {
+        if( fixedSingleStep_ )
+        {
             singleFixedStepIntegrator_.modifyCurrentState( currentState_ );
             currentState = singleFixedStepIntegrator_.performIntegrationStep( stepSize_ );
             
             // Find out the step size that was used during integration
             lastStepSize_ = singleFixedStepIntegrator_.getCurrentIndependentVariable( ) - currentIndependentVariable_;
-        } else {
+        }
+        else
+        {
             singleVariableStepIntegrator_.modifyCurrentState( currentState_ );
             currentState = singleVariableStepIntegrator_.performIntegrationStep( stepSize_ );
             
@@ -813,7 +849,8 @@ protected:
         unsigned int stepsToSkip = static_cast< unsigned int>( doubleStep );
         TimeStepType stepSize = stepSize_ * static_cast< double >( stepsToSkip + 1 );
         StateType predictedState = stateHistory_.at( stepsToSkip );
-        for ( unsigned int i = 0; i < order; i++ ){
+        for ( unsigned int i = 0; i < order; i++ )
+        {
             predictedState += extrapolationCoefficients[ order * 2 - 2 ][ i ] * stepSize *
                     derivHistory_.at( i * ( stepsToSkip + 1 ) + stepsToSkip );
         }
@@ -834,7 +871,8 @@ protected:
         TimeStepType stepSize = stepSize_ * static_cast< double >( stepsToSkip + 1 );
         StateType correctedState = stateHistory_.at( stepsToSkip ) + extrapolationCoefficients[ order * 2 - 1 ][ 0 ] *
                 stepSize * predictedDerivative_;
-        for ( unsigned int i = 1; i < order; i++ ){
+        for ( unsigned int i = 1; i < order; i++ )
+        {
             correctedState += stepSize * extrapolationCoefficients[ order * 2 - 1 ][ i ] *
                     derivHistory_.at( ( i - 1 ) * ( stepsToSkip + 1 ) + stepsToSkip );
         }
@@ -886,9 +924,11 @@ protected:
         StateType c1 = absoluteError1.cwiseMin( relativeError1 );
         StateType c2 = absoluteError2.cwiseMin( relativeError2 );
         bool oneBetter = true;
-        if( strictCompare_ ){
+        if( strictCompare_ )
+        {
             // Needs to be better or equal for each component
-            for( int i = 0; i < c1.size( ); ++i ){
+            for( int i = 0; i < c1.size( ); ++i )
+            {
                 oneBetter = oneBetter && ( c1( i ) <= c2( i ) );
             }
         } else {
@@ -910,7 +950,8 @@ protected:
     {
         bool belowLimit = true;
         // All components needs to be below the upper limit (tol)
-        for( int i = 0; i < absoluteError.size( ); ++i ){
+        for( int i = 0; i < absoluteError.size( ); ++i )
+        {
             belowLimit = belowLimit &&
                     ( absoluteError( i ) < absoluteErrorTolerance_( i )
                       || relativeError( i ) < relativeErrorTolerance_( i ) );
@@ -930,7 +971,8 @@ protected:
     {
         bool belowLimit = true;
         // All components need to be above lower limit ( tol / bw )
-        for( int i = 0; i < absoluteError.size( ); ++i ){
+        for( int i = 0; i < absoluteError.size( ); ++i )
+        {
             belowLimit = belowLimit &&
                     ( absoluteError( i ) <= absoluteErrorTolerance_( i ) / bandwidth_
                       || relativeError( i ) <= relativeErrorTolerance_( i ) / bandwidth_ );
@@ -983,6 +1025,11 @@ protected:
     StateDerivativeType lastDerivative_;
 };
 
+extern template class AdamsBashforthMoultonIntegrator < double, Eigen::VectorXd, Eigen::VectorXd >;
+extern template class AdamsBashforthMoultonIntegrator < double, Eigen::Vector6d, Eigen::Vector6d >;
+extern template class AdamsBashforthMoultonIntegrator < double, Eigen::MatrixXd, Eigen::MatrixXd >;
+
+
 //! Typedef of Adam-Bashforh-Moulton integrator (state/state derivative = VectorXd, independent variable = double).
 /*!
  * Typedef of a Adams-Bashforth-Moulton integrator with VectorXds as state and state derivative and double as
@@ -1002,20 +1049,20 @@ typedef AdamsBashforthMoultonIntegrator< double, double, double, double > AdamsB
  * Typedef of pointer to a Adams-Bashforth-Moulton integrator with VectorXds as state and state derivative and double
  * as independent variable.
  */
-typedef boost::shared_ptr< AdamsBashforthMoultonIntegratorXd > AdamsBashforthMoultonIntegratorXdPointer;
+typedef std::shared_ptr< AdamsBashforthMoultonIntegratorXd > AdamsBashforthMoultonIntegratorXdPointer;
 
 //! Typedef of pointer to a scalar Adams-Bashforth-Moulton integrator.
 /*!
  * Typedef of pointer to an Adams-Bashforth-Moulton integrator with doubles as state and state derivative and
  * independent variable.
  */
-typedef boost::shared_ptr< AdamsBashforthMoultonIntegratord > AdamsBashforthMoultonIntegratordPointer;
+typedef std::shared_ptr< AdamsBashforthMoultonIntegratord > AdamsBashforthMoultonIntegratordPointer;
 
 //! Truncation error coefficients ( size: 1 x o )
 /*!
  * truncationErrorCoefficients( o - 1 )
  */
-template < typename IndependentVariableType, typename StateType, typename StateDerivativeType, typename TimeStepType>
+template< typename IndependentVariableType, typename StateType, typename StateDerivativeType, typename TimeStepType>
 const double AdamsBashforthMoultonIntegrator< IndependentVariableType, StateType, StateDerivativeType, TimeStepType >::truncationErrorCoefficients[ 12 ] = {
     +2.00000000000000000e+00, +6.00000000000000000e+00, +1.00000000000000000e+01, +1.42105263157894743e+01,
     +1.85925925925925917e+01, +2.31170336037079949e+01, +2.77629090909090905e+01, +3.25146526080169664e+01,
@@ -1027,7 +1074,7 @@ const double AdamsBashforthMoultonIntegrator< IndependentVariableType, StateType
  * extrapolationCoefficients( o * 2 - 2, i )                 <--- predictor coefficients
  * extrapolationCoefficients( o * 2 - 1, i )                 <--- corrector coefficients
  */
-template < typename IndependentVariableType, typename StateType, typename StateDerivativeType, typename TimeStepType >
+template< typename IndependentVariableType, typename StateType, typename StateDerivativeType, typename TimeStepType >
 const double AdamsBashforthMoultonIntegrator< IndependentVariableType, StateType, StateDerivativeType, TimeStepType >::extrapolationCoefficients[ 24 ][ 12 ] = {
     {+1.00000000000000000e+00, +0.00000000000000000e+00, +0.00000000000000000e+00, +0.00000000000000000e+00,
      +0.00000000000000000e+00, +0.00000000000000000e+00, +0.00000000000000000e+00, +0.00000000000000000e+00,
@@ -1113,7 +1160,7 @@ const double AdamsBashforthMoultonIntegrator< IndependentVariableType, StateType
  *
  * Order k occupies : registers ( k - 1 )^2 - k + 1 to k^2 - k - 1
  */
-template < typename IndependentVariableType, typename StateType, typename StateDerivativeType, typename TimeStepType >
+template< typename IndependentVariableType, typename StateType, typename StateDerivativeType, typename TimeStepType >
 const double AdamsBashforthMoultonIntegrator< IndependentVariableType, StateType, StateDerivativeType, TimeStepType >::interpolationCoefficients[ 132 ][ 24 ] = {
     {+5.00000000000000000e-01, +5.00000000000000000e-01, -1.25000000000000000e-01, +1.25000000000000000e-01,
      +0.00000000000000000e+00, +0.00000000000000000e+00, +0.00000000000000000e+00, +0.00000000000000000e+00,

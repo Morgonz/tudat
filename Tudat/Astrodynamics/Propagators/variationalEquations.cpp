@@ -9,11 +9,14 @@
  */
 #include <map>
 
-#include <boost/function.hpp>
+
+#include <functional>
 
 #include <Eigen/Core>
 
 #include "Tudat/Astrodynamics/Propagators/variationalEquations.h"
+#include "Tudat/Astrodynamics/Propagators/rotationalMotionQuaternionsStateDerivative.h"
+
 #include "Tudat/Astrodynamics/OrbitDetermination/AccelerationPartials/accelerationPartial.h"
 
 
@@ -23,30 +26,57 @@ namespace tudat
 namespace propagators
 {
 
+template< typename StateScalarType >
+void VariationalEquations::getBodyInitialStatePartialMatrix(
+        const Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic >& stateTransitionAndSensitivityMatrices,
+        Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic > > currentMatrixDerivative )
+{
+    setBodyStatePartialMatrix( );
+
+    // Add partials of body positions and velocities.
+    currentMatrixDerivative.block( 0, 0, totalDynamicalStateSize_, numberOfParameterValues_ ) =
+            ( variationalMatrix_.template cast< StateScalarType >( ) * stateTransitionAndSensitivityMatrices );
+}
+
 //! Calculates matrix containing partial derivatives of state derivatives w.r.t. body state.
 void VariationalEquations::setBodyStatePartialMatrix( )
 {
     // Initialize partial matrix
     variationalMatrix_.setZero( );
 
-    if( dynamicalStatesToEstimate_.count( propagators::transational_state ) > 0 )
+    if( dynamicalStatesToEstimate_.count( propagators::translational_state ) > 0 )
     {
-        int startIndex = stateTypeStartIndices_.at( propagators::transational_state );
-        for( unsigned int i = 0; i < dynamicalStatesToEstimate_.at( propagators::transational_state ).size( ); i++ )
+        int startIndex = stateTypeStartIndices_.at( propagators::translational_state );
+        for( unsigned int i = 0; i < dynamicalStatesToEstimate_.at( propagators::translational_state ).size( ); i++ )
         {
             variationalMatrix_.block( startIndex + i * 6, startIndex + i * 6 + 3, 3, 3 ).setIdentity( );
         }
     }
 
+    if( dynamicalStatesToEstimate_.count( propagators::rotational_state ) > 0 )
+    {
+         Eigen::VectorXd rotationalStates = currentStatesPerTypeInConventionalRepresentation_.at(
+                     propagators::rotational_state );
+
+        int startIndex = stateTypeStartIndices_.at( propagators::rotational_state );
+        for( unsigned int i = 0; i < dynamicalStatesToEstimate_.at( propagators::rotational_state ).size( ); i++ )
+        {
+            variationalMatrix_.block( startIndex + i * 7, startIndex + i * 7 , 4, 4 ) =
+                    getQuaterionToQuaternionRateMatrix( rotationalStates.segment( 7 * i + 4, 3 ) );
+            variationalMatrix_.block( startIndex + i * 7, startIndex + i * 7 + 4, 4, 3 ) =
+                    getAngularVelocityToQuaternionRateMatrix( rotationalStates.segment( 7 * i, 4 ) );
+        }
+    }
+
     // Iterate over all bodies undergoing accelerations for which initial condition is to be estimated.
     for( std::map< IntegratedStateType, std::vector< std::multimap< std::pair< int, int >,
-         boost::function< void( Eigen::Block< Eigen::MatrixXd > ) > > > >::iterator
+         std::function< void( Eigen::Block< Eigen::MatrixXd > ) > > > >::iterator
          typeIterator = statePartialList_.begin( ); typeIterator != statePartialList_.end( ); typeIterator++ )
     {
         int startIndex = stateTypeStartIndices_.at( typeIterator->first );
         int currentStateSize = getSingleIntegrationSize( typeIterator->first );
-        int entriesToSkipPerEntry = currentStateSize - currentStateSize /
-                getSingleIntegrationDifferentialEquationOrder( typeIterator->first );
+        int entriesToSkipPerEntry = currentStateSize - getGeneralizedAccelerationSize( typeIterator->first );
+
         for( unsigned int i = 0; i < typeIterator->second.size( ); i++ )
         {
             // Iterate over all bodies exerting an acceleration on this body.
@@ -63,12 +93,19 @@ void VariationalEquations::setBodyStatePartialMatrix( )
         }
     }
 
-    // Correct partials for hierarchical dynamics
    for( unsigned int i = 0; i < statePartialAdditionIndices_.size( ); i++ )
    {
        variationalMatrix_.block( 0, statePartialAdditionIndices_.at( i ).second, totalDynamicalStateSize_, 3 ) +=
                variationalMatrix_.block( 0, statePartialAdditionIndices_.at( i ).first, totalDynamicalStateSize_, 3 );
    }
+
+   for( unsigned int i = 0; i < inertiaTensorsForMultiplication_.size( ); i++ )
+   {
+       variationalMatrix_.block( inertiaTensorsForMultiplication_.at( i ).first, 0, 3, totalDynamicalStateSize_ ) =
+               ( inertiaTensorsForMultiplication_.at( i ).second( ).inverse( ) ) *
+               variationalMatrix_.block( inertiaTensorsForMultiplication_.at( i ).first, 0, 3, totalDynamicalStateSize_ ).eval( );
+   }
+
 }
 
 //! Function to clear reference/cached values of state derivative partials.
@@ -89,44 +126,11 @@ void VariationalEquations::clearPartials( )
     }
 }
 
-//! This function updates all state derivative models to the current time and state.
-void VariationalEquations::updatePartials( const double currentTime )
-{
-    // Update all acceleration partials to current state and time. Information is passed indirectly from here, through
-    // (function) pointers set in acceleration partial classes
-    for( stateDerivativeTypeIterator_ = stateDerivativePartialList_.begin( );
-         stateDerivativeTypeIterator_ != stateDerivativePartialList_.end( );
-         stateDerivativeTypeIterator_++ )
-    {
-        for( unsigned int i = 0; i < stateDerivativeTypeIterator_->second.size( ); i++ )
-        {
-            for( unsigned int j = 0; j < stateDerivativeTypeIterator_->second.at( i ).size( ); j++ )
-            {
-                stateDerivativeTypeIterator_->second.at( i ).at( j )->update( currentTime );
-            }
-
-        }
-    }
-
-    for( stateDerivativeTypeIterator_ = stateDerivativePartialList_.begin( );
-         stateDerivativeTypeIterator_ != stateDerivativePartialList_.end( );
-         stateDerivativeTypeIterator_++ )
-    {
-        for( unsigned int i = 0; i < stateDerivativeTypeIterator_->second.size( ); i++ )
-        {
-            for( unsigned int j = 0; j < stateDerivativeTypeIterator_->second.at( i ).size( ); j++ )
-            {
-                stateDerivativeTypeIterator_->second.at( i ).at( j )->updateParameterPartials( );
-            }
-
-        }
-    }
-}
-\
 //! Function (called by constructor) to set up the statePartialList_ member from the state derivative partials
 void VariationalEquations::setStatePartialFunctionList( )
 {
-    std::pair< boost::function< void( Eigen::Block< Eigen::MatrixXd > ) >, int > currentDerivativeFunction;
+    std::pair< std::function< void( Eigen::Block< Eigen::MatrixXd > ) >, int > currentDerivativeFunction;
+
 
     // Iterate over all state types
     for( std::map< propagators::IntegratedStateType,
@@ -138,7 +142,7 @@ void VariationalEquations::setStatePartialFunctionList( )
         // Iterate over all bodies undergoing 'accelerations' for which initial state is to be estimated.
         for( unsigned int i = 0; i < stateDerivativeTypeIterator_->second.size( ); i++ )
         {
-            std::multimap< std::pair< int, int >, boost::function< void( Eigen::Block< Eigen::MatrixXd > ) > >
+            std::multimap< std::pair< int, int >, std::function< void( Eigen::Block< Eigen::MatrixXd > ) > >
                     currentBodyPartialList;
 
             // Iterate over all 'accelerations' from single body on other single body
@@ -175,6 +179,17 @@ void VariationalEquations::setStatePartialFunctionList( )
     }
 }
 
-}
 
-}
+template void VariationalEquations::getBodyInitialStatePartialMatrix< double >(
+        const Eigen::Matrix< double, Eigen::Dynamic, Eigen::Dynamic >& stateTransitionAndSensitivityMatrices,
+        Eigen::Block< Eigen::Matrix< double, Eigen::Dynamic, Eigen::Dynamic > > currentMatrixDerivative );
+
+//#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+template void VariationalEquations::getBodyInitialStatePartialMatrix< long double >(
+        const Eigen::Matrix< long double, Eigen::Dynamic, Eigen::Dynamic >& stateTransitionAndSensitivityMatrices,
+        Eigen::Block< Eigen::Matrix< long double, Eigen::Dynamic, Eigen::Dynamic > > currentMatrixDerivative );
+//#endif
+
+} // namespace propagators
+
+} // namespace tudat

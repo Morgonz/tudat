@@ -21,7 +21,7 @@ int getSingleIntegrationSize( const IntegratedStateType stateType )
     int singleStateSize = 0;
     switch( stateType )
     {
-    case transational_state:
+    case translational_state:
         singleStateSize = 6;
         break;
     case rotational_state:
@@ -44,10 +44,13 @@ int getSingleIntegrationDifferentialEquationOrder( const IntegratedStateType sta
     int singleStateSize = 0;
     switch( stateType )
     {
-    case transational_state:
+    case translational_state:
         singleStateSize = 2;
         break;
     case body_mass_state:
+        singleStateSize = 1;
+        break;
+    case rotational_state:
         singleStateSize = 1;
         break;
     default:
@@ -57,6 +60,38 @@ int getSingleIntegrationDifferentialEquationOrder( const IntegratedStateType sta
     }
     return singleStateSize;
 }
+
+//! Function to get the size of the generalized acceleration for a given state type
+int getGeneralizedAccelerationSize( const IntegratedStateType stateType )
+{
+    int accelerationSize = 0;
+    switch( stateType )
+    {
+    case translational_state:
+        accelerationSize = 3;
+        break;
+    case body_mass_state:
+        accelerationSize = 1;
+        break;
+    case rotational_state:
+        accelerationSize = 3;
+        break;
+    default:
+        std::string errorMessage =
+                "Did not recognize state type " + std::to_string( stateType ) + "when getting acceleration sizw";
+       throw std::runtime_error( errorMessage );
+    }
+    return accelerationSize;
+}
+
+
+template class SingleStateTypeDerivative< double, double >;
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+template class SingleStateTypeDerivative< long double, double >;
+template class SingleStateTypeDerivative< double, Time >;
+template class SingleStateTypeDerivative< long double, Time >;
+#endif
 
 }
 

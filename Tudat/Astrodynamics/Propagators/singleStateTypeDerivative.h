@@ -11,7 +11,12 @@
 #ifndef TUDAT_STATEDERIVATIVE_H
 #define TUDAT_STATEDERIVATIVE_H
 
+#include <map>
+
 #include <Eigen/Core>
+
+#include "Tudat/Basics/timeType.h"
+#include <Tudat/Basics/utilityMacros.h>
 
 namespace tudat
 {
@@ -19,19 +24,15 @@ namespace tudat
 namespace propagators
 {
 
-
-
 //! Enum listing types of dynamics that can be numerically integrated
 enum IntegratedStateType
 {
     hybrid = 0,
     translational_state = 1,
-    transational_state = translational_state,  // deprecated (typo)
     rotational_state = 2,
     body_mass_state = 3,
     custom_state = 4
 };
-
 
 //! Get size of state for single propagated state of given type.
 /*!
@@ -49,6 +50,14 @@ int getSingleIntegrationSize( const IntegratedStateType stateType );
  */
 int getSingleIntegrationDifferentialEquationOrder( const IntegratedStateType stateType );
 
+//! Function to get the size of the generalized acceleration for a given state type
+/*!
+ * Function to get the size of the generalized acceleration (e.g. acceleration for translational dynamics, torque for rotational
+ * dynamics, mass rate for mass) for a given state type
+ * \param stateType State type for which generalized acceleration size is to be determined
+ * \return Generalized acceleration size
+ */
+int getGeneralizedAccelerationSize( const IntegratedStateType stateType );
 
 //! Base class for calculating the state derivative model for a single type of dynamics.
 /*!
@@ -70,7 +79,13 @@ public:
      * \param integratedStateType Type of dynamics for whichh the state derivative is calculated.
      */
     SingleStateTypeDerivative( const IntegratedStateType integratedStateType ):
-        integratedStateType_( integratedStateType ){ }
+        integratedStateType_( integratedStateType )
+    {
+        if( isStateToBePostProcessed( ) )
+        {
+            unprocessedState_.setZero( getPropagatedStateSize( ) );
+        }
+    }
 
     //! Virtual destructor.
     virtual ~SingleStateTypeDerivative( ){ }
@@ -79,7 +94,7 @@ public:
     /*!
      * Calculates the state derivative of the system of equations for the given type of
      * dynamics. The environment and acceleration models (updateStateDerivativeModel) must be
-     * updated before calling this function. It returns the state derivative in teh form required
+     * updated before calling this function. It returns the state derivative in the form required
      * for the specific type of propagator used (defined by derived class).
      * \param time Time at which the state derivative is to be calculated.
      * \param stateOfSystemToBeIntegrated Current state of the system, in the form that the equations are propagated (i.e.
@@ -126,7 +141,6 @@ public:
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >& internalSolution, const TimeType& time,
             Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSoluton ) = 0;
 
-
     //! Function to convert the state in the conventional form to the propagator-specific form.
     /*!
      * Function to convert the state in the conventional form to the propagator-specific form.  The
@@ -158,12 +172,24 @@ public:
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic >& internalSolution, const TimeType& time,
             Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSoluton ) = 0;
 
-    //! Function to return the size of the state handled by the object
+    //! Function to return the size of the conventional state handled by the object.
     /*!
-     * Function to return the size of the state handled by the object
+     * Function to return the size of the conventional state handled by the object. This is the size of the conventional
+     * propagation state, e.g., size of Cartesian state for translational propagation.
      * \return Size of the state under consideration.
      */
-    virtual int getStateSize( ) = 0;
+    virtual int getConventionalStateSize( ) = 0;
+
+    //! Function to return the size of the propagated state handled by the object.
+    /*!
+     * Function to return the size of the propagated state handled by the object. This is the size of the actual propagation
+     * state, e.g., size of USM7 state for translational propagation.
+     * \return Size of the propagated state under consideration.
+     */
+    virtual int getPropagatedStateSize( )
+    {
+        return getConventionalStateSize( );
+    }
 
     //! Function to return the type of dynamics for which the state derivative is calculated.
     /*!
@@ -175,16 +201,74 @@ public:
         return integratedStateType_;
     }
 
+    //! Function to process the state vector during propagation.
+    /*!
+     * Function to process the state during propagation. Is especially useful for attitude states (e.g.,
+     * normalization of quaternions and transformation to/from shadow attitude parameters).
+     * \param unprocessedState State computed after propagation.
+     */
+    virtual void postProcessState( Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > unprocessedState )
+    {
+        TUDAT_UNUSED_PARAMETER( unprocessedState );
+    }
+
+    virtual void postProcessState( Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic >& unprocessedState )
+    {
+        unprocessedState_ = unprocessedState.block( 0, 0, getPropagatedStateSize( ), 1 );
+        postProcessState( unprocessedState_.block( 0, 0, getPropagatedStateSize( ), 1 ) );
+        unprocessedState.block( 0, 0, getPropagatedStateSize( ), 1 ) = unprocessedState_;
+    }
+
+    //! Function to return whether the state needs to be post-processed.
+    /*!
+     * Function to return whether the state needs to be post-processed. Default value is false.
+     * \return Boolean informing whether the state needs to be post-processed.
+     */
+    virtual bool isStateToBePostProcessed( )
+    {
+        return false;
+    }
+
 protected:
 
-    //! Type of dynamics for whichh the state derivative is calculated.
+    //! Type of dynamics for which the state derivative is calculated.
     IntegratedStateType integratedStateType_;
 
+    //! Vector used during post-processing of state.
+    Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > unprocessedState_;
 };
 
+extern template class SingleStateTypeDerivative< double, double >;
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+extern template class SingleStateTypeDerivative< long double, double >;
+extern template class SingleStateTypeDerivative< double, Time >;
+extern template class SingleStateTypeDerivative< long double, Time >;
+#endif
 
 } // namespace propagators
 
 } // namespace tudat
+
+
+namespace std
+{
+
+//! Hash for IntegratedStateType enum.
+template< >
+struct hash< tudat::propagators::IntegratedStateType >
+{
+    typedef tudat::propagators::IntegratedStateType argument_type;
+    typedef size_t result_type;
+
+    result_type operator () (const argument_type& x) const
+    {
+        using type = typename std::underlying_type<argument_type>::type;
+        return std::hash< type >( )( static_cast< type >( x ) );
+    }
+};
+
+} // namespace std
+
 
 #endif // TUDAT_STATEDERIVATIVE_H

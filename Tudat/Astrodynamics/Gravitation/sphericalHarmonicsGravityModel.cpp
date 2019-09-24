@@ -30,6 +30,7 @@
 
 namespace tudat
 {
+
 namespace gravitation
 {
 
@@ -40,7 +41,10 @@ Eigen::Vector3d computeGeodesyNormalizedGravitationalAccelerationSum(
         const double equatorialRadius,
         const Eigen::MatrixXd& cosineHarmonicCoefficients,
         const Eigen::MatrixXd& sineHarmonicCoefficients,
-        boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache )
+        std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
+        std::map< std::pair< int, int >, Eigen::Vector3d >& accelerationPerTerm,
+        const bool saveSeparateTerms,
+        const Eigen::Matrix3d& accelerationRotation )
 {
     // Set highest degree and order.
     const int highestDegree = cosineHarmonicCoefficients.rows( );
@@ -58,15 +62,17 @@ Eigen::Vector3d computeGeodesyNormalizedGravitationalAccelerationSum(
                                      sphericalpositionOfBodySubjectToAcceleration( 2 ),
                                      equatorialRadius );
 
-    boost::shared_ptr< basic_mathematics::LegendreCache > legendreCacheReference =
+    std::shared_ptr< basic_mathematics::LegendreCache > legendreCacheReference =
             sphericalHarmonicsCache->getLegendreCache( );
-
 
     // Compute gradient premultiplier.
     const double preMultiplier = gravitationalParameter / equatorialRadius;
 
     // Initialize gradient vector.
     Eigen::Vector3d sphericalGradient = Eigen::Vector3d::Zero( );
+
+    Eigen::Matrix3d transformationToCartesianCoordinates = coordinate_conversions::getSphericalToCartesianGradientMatrix(
+                positionOfBodySubjectToAcceleration );
 
     // Loop through all degrees.
     for ( int degree = 0; degree < highestDegree; degree++ )
@@ -82,23 +88,43 @@ Eigen::Vector3d computeGeodesyNormalizedGravitationalAccelerationSum(
                         degree, order );
 
             // Compute the potential gradient of a single spherical harmonic term.
-            sphericalGradient += basic_mathematics::computePotentialGradient(
-                        sphericalpositionOfBodySubjectToAcceleration,
-                        preMultiplier,
-                        degree,
-                        order,
-                        cosineHarmonicCoefficients( degree, order ),
-                        sineHarmonicCoefficients( degree, order ),
-                        legendrePolynomial,
-                        legendrePolynomialDerivative, sphericalHarmonicsCache );
+            if( saveSeparateTerms )
+            {
+                accelerationPerTerm[ std::make_pair( degree, order ) ] =
+                        basic_mathematics::computePotentialGradient(
+                            sphericalpositionOfBodySubjectToAcceleration,
+                            preMultiplier,
+                            degree,
+                            order,
+                            cosineHarmonicCoefficients( degree, order ),
+                            sineHarmonicCoefficients( degree, order ),
+                            legendrePolynomial,
+                            legendrePolynomialDerivative, sphericalHarmonicsCache );
+                sphericalGradient += accelerationPerTerm[ std::make_pair( degree, order ) ];
+                accelerationPerTerm[ std::make_pair( degree, order ) ] =
+                        accelerationRotation * (
+                            transformationToCartesianCoordinates * accelerationPerTerm[ std::make_pair( degree, order ) ] );
+            }
+            else
+            {
+                // Compute the potential gradient of a single spherical harmonic term.
+                sphericalGradient += basic_mathematics::computePotentialGradient(
+                            sphericalpositionOfBodySubjectToAcceleration,
+                            preMultiplier,
+                            degree,
+                            order,
+                            cosineHarmonicCoefficients( degree, order ),
+                            sineHarmonicCoefficients( degree, order ),
+                            legendrePolynomial,
+                            legendrePolynomialDerivative, sphericalHarmonicsCache );
+            }
         }
     }
 
 
     // Convert from spherical gradient to Cartesian gradient (which equals acceleration vector) and
     // return the resulting acceleration vector.
-    return coordinate_conversions::convertSphericalToCartesianGradient(
-                sphericalGradient, positionOfBodySubjectToAcceleration );
+    return accelerationRotation * ( transformationToCartesianCoordinates * sphericalGradient );
 }
 
 //! Compute gravitational acceleration due to single spherical harmonics term.
@@ -110,7 +136,7 @@ Eigen::Vector3d computeSingleGeodesyNormalizedGravitationalAcceleration(
         const int order,
         const double cosineHarmonicCoefficient,
         const double sineHarmonicCoefficient,
-        boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache )
+        std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache )
 {
     // Declare spherical position vector.
     Eigen::Vector3d sphericalpositionOfBodySubjectToAcceleration = coordinate_conversions::
@@ -153,4 +179,5 @@ Eigen::Vector3d computeSingleGeodesyNormalizedGravitationalAcceleration(
 }
 
 } // namespace gravitation
+
 } // namespace tudat

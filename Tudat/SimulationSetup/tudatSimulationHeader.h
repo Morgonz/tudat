@@ -8,7 +8,6 @@
  *    http://tudat.tudelft.nl/LICENSE.
  */
 
-
 #ifndef TUDAT_SIMULATIONHEADER_H
 #define TUDAT_SIMULATIONHEADER_H
 
@@ -23,9 +22,11 @@
 #include "Tudat/InputOutput/basicInputOutput.h"
 #include "Tudat/InputOutput/mapTextFileReader.h"
 
-#include "Tudat/Mathematics/BasicMathematics/linearAlgebra.h"
 #include "Tudat/Basics/basicTypedefs.h"
+
+#include "Tudat/Mathematics/BasicMathematics/linearAlgebra.h"
 #include "Tudat/Mathematics/BasicMathematics/mathematicalConstants.h"
+#include "Tudat/Mathematics/Filters/createFilter.h"
 #include "Tudat/Mathematics/NumericalIntegrators/createNumericalIntegrator.h"
 #include "Tudat/Mathematics/Interpolators/createInterpolator.h"
 
@@ -44,7 +45,7 @@
 #include "Tudat/SimulationSetup/PropagationSetup/propagationSettings.h"
 #include "Tudat/SimulationSetup/PropagationSetup/propagationOutputSettings.h"
 #include "Tudat/SimulationSetup/PropagationSetup/propagationTerminationSettings.h"
-#include "Tudat/SimulationSetup/PropagationSetup/createNumericalSimulator.h"
+#include "Tudat/SimulationSetup/EstimationSetup/createNumericalSimulator.h"
 #include "Tudat/SimulationSetup/PropagationSetup/thrustSettings.h"
 #include "Tudat/SimulationSetup/PropagationSetup/createMassRateModels.h"
 

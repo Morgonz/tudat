@@ -28,7 +28,7 @@ void checkValidityOfRequiredEnvironmentUpdates(
 
     // Iterate over all environment update types.
     for( std::map< propagators::EnvironmentModelsToUpdate,
-             std::vector< std::string > >::const_iterator
+         std::vector< std::string > >::const_iterator
          updateIterator = requestedUpdates.begin( );
          updateIterator != requestedUpdates.end( ); updateIterator++ )
     {
@@ -42,80 +42,80 @@ void checkValidityOfRequiredEnvironmentUpdates(
                 if( bodyMap.count( updateIterator->second.at( i ) ) == 0 )
                 {
                     throw std::runtime_error(
-                        "Error when making environment model update settings, could not find body "
-                        + updateIterator->second.at( i ) );
+                                "Error when making environment model update settings, could not find body "
+                                + updateIterator->second.at( i ) );
                 }
 
                 // Check if requested environment model exists.
                 switch( updateIterator->first )
                 {
-                case body_transational_state_update:
+                case body_translational_state_update:
                 {
-                    if( bodyMap.at( updateIterator->second.at( i ) )->getEphemeris( ) == NULL )
+                    if( bodyMap.at( updateIterator->second.at( i ) )->getEphemeris( ) == nullptr )
                     {
                         throw std::runtime_error(
-                            "Error when making environment model update settings, could not find ephemeris of body "
-                            + updateIterator->second.at( i ) );
+                                    "Error when making environment model update settings, could not find ephemeris of body "
+                                    + updateIterator->second.at( i ) );
                     }
                     break;
                 }
                 case body_rotational_state_update:
                 {
                     if( ( bodyMap.at( updateIterator->second.at( i ) )->
-                        getRotationalEphemeris( ) == NULL ) &&
-                            ( bodyMap.at( updateIterator->second.at( i ) )->getDependentOrientationCalculator( ) == NULL ) )
+                          getRotationalEphemeris( ) == nullptr ) &&
+                            ( bodyMap.at( updateIterator->second.at( i ) )->getDependentOrientationCalculator( ) == nullptr ) )
                     {
                         throw std::runtime_error(
-                            "Error when making environment model update settings, could not find rotational ephemeris or dependent orientation calculator of body "
-                            + updateIterator->second.at( i ) );
+                                    "Error when making environment model update settings, could not find rotational ephemeris or dependent orientation calculator of body "
+                                    + updateIterator->second.at( i ) );
                     }
                     break;
                 }
                 case spherical_harmonic_gravity_field_update:
                 {
-                    boost::shared_ptr< gravitation::SphericalHarmonicsGravityField >
-                        gravityFieldModel =
-                            boost::dynamic_pointer_cast< gravitation::SphericalHarmonicsGravityField >(
+                    std::shared_ptr< gravitation::SphericalHarmonicsGravityField >
+                            gravityFieldModel =
+                            std::dynamic_pointer_cast< gravitation::SphericalHarmonicsGravityField >(
                                 bodyMap.at( updateIterator->second.at( i ) )->getGravityFieldModel( ) );
-                    if( gravityFieldModel == NULL )
+                    if( gravityFieldModel == nullptr )
                     {
                         throw std::runtime_error(
-                            "Error when making environment model update settings, could not find spherical harmonic gravity field of body "
-                            + updateIterator->second.at( i ) );
+                                    "Error when making environment model update settings, could not find spherical harmonic gravity field of body "
+                                    + updateIterator->second.at( i ) );
                     }
                     break;
                 }
                 case vehicle_flight_conditions_update:
                 {
-                    boost::shared_ptr< aerodynamics::FlightConditions > flightConditions = bodyMap.at(
+                    std::shared_ptr< aerodynamics::FlightConditions > flightConditions = bodyMap.at(
                                 updateIterator->second.at( i ) )->getFlightConditions( );
-                    if( flightConditions == NULL )
+                    if( flightConditions == nullptr )
                     {
                         throw std::runtime_error(
-                            "Error when making environment model update settings, could not find flight conditions of body "
-                            + updateIterator->second.at( i ) );
+                                    "Error when making environment model update settings, could not find flight conditions of body "
+                                    + updateIterator->second.at( i ) );
                     }
                     break;
                 }
                 case radiation_pressure_interface_update:
                 {
-                    std::map< std::string, boost::shared_ptr< electro_magnetism::RadiationPressureInterface > >
+                    std::map< std::string, std::shared_ptr< electro_magnetism::RadiationPressureInterface > >
                             radiationPressureInterfaces = bodyMap.at(
                                 updateIterator->second.at( i ) )->getRadiationPressureInterfaces( );
                     if( radiationPressureInterfaces.size( ) == 0 )
                     {
                         throw std::runtime_error(
-                            "Error when making environment model update settings, could not find radiation pressure interface of body "
-                            + updateIterator->second.at( i ) );
+                                    "Error when making environment model update settings, could not find radiation pressure interface of body "
+                                    + updateIterator->second.at( i ) );
                     }
                     break;
                 }
                 case body_mass_update:
-                    if( bodyMap.at( updateIterator->second.at( i ) )->getBodyMassFunction( ) == NULL )
+                    if( bodyMap.at( updateIterator->second.at( i ) )->getBodyMassFunction( ) == nullptr )
                     {
                         throw std::runtime_error(
-                            "Error when making environment model update settings, no body mass function of body "
-                            + updateIterator->second.at( i ) );
+                                    "Error when making environment model update settings, no body mass function of body "
+                                    + updateIterator->second.at( i ) );
                     }
 
                     break;
@@ -125,6 +125,76 @@ void checkValidityOfRequiredEnvironmentUpdates(
     }
 }
 
+//! Function that removes propagated states from the updated environment variables
+void removePropagatedStatesFomEnvironmentUpdates(
+        std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > >& environmentModelsToUpdate,
+        const std::map< IntegratedStateType, std::vector< std::pair< std::string, std::string > > >& integratedStateList )
+{
+    // Iterate over all propagated states
+    for( auto it = integratedStateList.begin( ); it != integratedStateList.end( ); it++ )
+    {
+        // Iterate over all propagated bodies for current state
+        for( unsigned int i = 0; i < it->second.size( ); i++ )
+        {
+            switch( it->first )
+            {
+            // Check for propagated translational states in update list, and remove if necessary
+            case translational_state:
+                if( environmentModelsToUpdate.count( body_translational_state_update ) > 0 )
+                {
+                    std::vector< std::string > bodiesToUpdate = environmentModelsToUpdate.at( body_translational_state_update );
+                    std::vector< std::string >::iterator findIterator =
+                            std::find( bodiesToUpdate.begin( ), bodiesToUpdate.end( ), it->second.at( i ).first );
+
+                    if( findIterator != bodiesToUpdate.end( ) )
+                    {
+                        bodiesToUpdate.erase( findIterator );
+                        environmentModelsToUpdate[ body_translational_state_update ] = bodiesToUpdate;
+
+                    }
+                }
+                break;
+                // Check for propagated rotational states in update list, and remove if necessary
+            case rotational_state:
+                if( environmentModelsToUpdate.count( body_rotational_state_update ) > 0 )
+                {
+                    std::vector< std::string > bodiesToUpdate = environmentModelsToUpdate.at( body_rotational_state_update );
+                    std::vector< std::string >::iterator findIterator =
+                            std::find( bodiesToUpdate.begin( ), bodiesToUpdate.end( ), it->second.at( i ).first );
+
+                    if( findIterator != bodiesToUpdate.end( ) )
+                    {
+                        bodiesToUpdate.erase( findIterator );
+                        environmentModelsToUpdate[ body_rotational_state_update ] = bodiesToUpdate;
+
+                    }
+                }
+                break;
+                // Check for propagated mass states in update list, and remove if necessary
+            case body_mass_state:
+                if( environmentModelsToUpdate.count( body_mass_update ) > 0 )
+                {
+                    std::vector< std::string > bodiesToUpdate = environmentModelsToUpdate.at( body_mass_update );
+                    std::vector< std::string >::iterator findIterator =
+                            std::find( bodiesToUpdate.begin( ), bodiesToUpdate.end( ), it->second.at( i ).first );
+
+                    if( findIterator != bodiesToUpdate.end( ) )
+                    {
+                        bodiesToUpdate.erase( findIterator );
+                        environmentModelsToUpdate[ body_mass_update ] = bodiesToUpdate;
+
+                    }
+                }
+                break;
+            case custom_state:
+                break;
+            default:
+                throw std::runtime_error( "Error when removing propagated states from environment updates, state type " +
+                                          std::to_string( it->first ) + " not recognized." );
+            }
+        }
+    }
+}
 
 //! Get list of required environment model update settings from torque models.
 std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > >
@@ -153,12 +223,31 @@ createRotationalEquationsOfMotionEnvironmentUpdaterSettings(
                 switch( currentTorqueModelType )
                 {
                 case second_order_gravitational_torque:
+                    singleTorqueUpdateNeeds[ body_translational_state_update ].push_back(
+                                torqueModelIterator->first );
+                    singleTorqueUpdateNeeds[ body_translational_state_update ].push_back(
+                                acceleratedBodyIterator->first );
                     break;
+                case spherical_harmonic_gravitational_torque:
+                    singleTorqueUpdateNeeds[ body_translational_state_update ].push_back(
+                                torqueModelIterator->first );
+                    singleTorqueUpdateNeeds[ body_translational_state_update ].push_back(
+                                acceleratedBodyIterator->first );
+                    singleTorqueUpdateNeeds[ spherical_harmonic_gravity_field_update ].push_back(
+                                acceleratedBodyIterator->first );
+                    break;
+
                 case aerodynamic_torque:
+                    singleTorqueUpdateNeeds[ body_translational_state_update ].push_back(
+                                torqueModelIterator->first );
+                    singleTorqueUpdateNeeds[ body_translational_state_update ].push_back(
+                                acceleratedBodyIterator->first );
                     singleTorqueUpdateNeeds[ body_rotational_state_update ].push_back(
                                 torqueModelIterator->first );
                     singleTorqueUpdateNeeds[ vehicle_flight_conditions_update ].push_back(
                                 acceleratedBodyIterator->first );
+                    break;
+                case inertial_torque:
                     break;
                 default:
                     std::cerr << "Error, update information not found for torque model " << currentTorqueModelType << std::endl;
@@ -166,7 +255,6 @@ createRotationalEquationsOfMotionEnvironmentUpdaterSettings(
                 }
             }
 
-            checkValidityOfRequiredEnvironmentUpdates( singleTorqueUpdateNeeds, bodyMap );
             addEnvironmentUpdates( environmentModelsToUpdate, singleTorqueUpdateNeeds );
         }
     }
@@ -185,19 +273,19 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
     using namespace propagators;
 
     std::map< propagators::EnvironmentModelsToUpdate,
-              std::vector< std::string > > environmentModelsToUpdate;
+            std::vector< std::string > > environmentModelsToUpdate;
     std::map< propagators::EnvironmentModelsToUpdate,
-              std::vector< std::string > > singleAccelerationUpdateNeeds;
+            std::vector< std::string > > singleAccelerationUpdateNeeds;
 
     // Iterate over all bodies being accelerated
     for( AccelerationMap::const_iterator acceleratedBodyIterator
-             = translationalAccelerationModels.begin( );
+         = translationalAccelerationModels.begin( );
          acceleratedBodyIterator != translationalAccelerationModels.end( );
          acceleratedBodyIterator++ )
     {
         // Iterate over all bodies exerting acceleration.
         for( SingleBodyAccelerationMap::const_iterator accelerationModelIterator
-                 = acceleratedBodyIterator->second.begin( );
+             = acceleratedBodyIterator->second.begin( );
              accelerationModelIterator != acceleratedBodyIterator->second.end( );
              accelerationModelIterator++ )
         {
@@ -210,7 +298,7 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                 // Add translational state of both bodies to update list for current acceleration model.
                 if( translationalAccelerationModels.count( accelerationModelIterator->first ) == 0 )
                 {
-                    singleAccelerationUpdateNeeds[ body_transational_state_update ].push_back(
+                    singleAccelerationUpdateNeeds[ body_translational_state_update ].push_back(
                                 accelerationModelIterator->first );
                 }
 
@@ -221,20 +309,20 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                     break;
                 case third_body_central_gravity:
                 {
-                    boost::shared_ptr< gravitation::ThirdBodyCentralGravityAcceleration >
-                        thirdBodyAcceleration = boost::dynamic_pointer_cast<
-                      gravitation::ThirdBodyCentralGravityAcceleration >(
+                    std::shared_ptr< gravitation::ThirdBodyCentralGravityAcceleration >
+                            thirdBodyAcceleration = std::dynamic_pointer_cast<
+                            gravitation::ThirdBodyCentralGravityAcceleration >(
                                 accelerationModelIterator->second.at( i ) );
-                    if( thirdBodyAcceleration != NULL && translationalAccelerationModels.count(
+                    if( thirdBodyAcceleration != nullptr && translationalAccelerationModels.count(
                                 thirdBodyAcceleration->getCentralBodyName( ) ) == 0 )
                     {
                         if( translationalAccelerationModels.count( thirdBodyAcceleration->getCentralBodyName( ) ) == 0 )
                         {
-                            singleAccelerationUpdateNeeds[ body_transational_state_update ].push_back(
+                            singleAccelerationUpdateNeeds[ body_translational_state_update ].push_back(
                                         thirdBodyAcceleration->getCentralBodyName( ) );
                         }
                     }
-                    else if( thirdBodyAcceleration == NULL )
+                    else if( thirdBodyAcceleration == nullptr )
                     {
                         throw std::runtime_error(
                                     std::string( "Error, incompatible input (ThirdBodyCentralGravityAcceleration) to" )
@@ -256,11 +344,19 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                     singleAccelerationUpdateNeeds[ body_mass_update ].push_back(
                                 acceleratedBodyIterator->first );
                     break;
+                case panelled_radiation_pressure_acceleration:
+                    singleAccelerationUpdateNeeds[ radiation_pressure_interface_update ].push_back(
+                                acceleratedBodyIterator->first );
+                    singleAccelerationUpdateNeeds[ body_mass_update ].push_back(
+                                acceleratedBodyIterator->first );
+                    singleAccelerationUpdateNeeds[ body_rotational_state_update ].push_back(
+                                acceleratedBodyIterator->first );
+                    break;
                 case spherical_harmonic_gravity:
                     singleAccelerationUpdateNeeds[ body_rotational_state_update ].push_back(
                                 accelerationModelIterator->first );
                     singleAccelerationUpdateNeeds[ spherical_harmonic_gravity_field_update ].
-                        push_back( accelerationModelIterator->first );
+                            push_back( accelerationModelIterator->first );
                     break;
                 case mutual_spherical_harmonic_gravity:
                     singleAccelerationUpdateNeeds[ body_rotational_state_update ].push_back(
@@ -277,25 +373,25 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                     singleAccelerationUpdateNeeds[ body_rotational_state_update ].push_back(
                                 accelerationModelIterator->first );
                     singleAccelerationUpdateNeeds[ spherical_harmonic_gravity_field_update ].
-                        push_back( accelerationModelIterator->first );
+                            push_back( accelerationModelIterator->first );
 
-                    boost::shared_ptr<
-                      gravitation::ThirdBodySphericalHarmonicsGravitationalAccelerationModel >
-                            thirdBodyAcceleration = boost::dynamic_pointer_cast<
+                    std::shared_ptr<
+                            gravitation::ThirdBodySphericalHarmonicsGravitationalAccelerationModel >
+                            thirdBodyAcceleration = std::dynamic_pointer_cast<
                             gravitation::ThirdBodySphericalHarmonicsGravitationalAccelerationModel >(
                                 accelerationModelIterator->second.at( i ) );;
-                    if( thirdBodyAcceleration != NULL && translationalAccelerationModels.count(
+                    if( thirdBodyAcceleration != nullptr && translationalAccelerationModels.count(
                                 thirdBodyAcceleration->getCentralBodyName( ) ) == 0  )
                     {
-                        singleAccelerationUpdateNeeds[ body_transational_state_update ].push_back(
+                        singleAccelerationUpdateNeeds[ body_translational_state_update ].push_back(
                                     thirdBodyAcceleration->getCentralBodyName( ) );
                     }
-                    else if( thirdBodyAcceleration == NULL )
+                    else if( thirdBodyAcceleration == nullptr )
                     {
                         throw std::runtime_error(
-                            std::string( "Error, incompatible input (ThirdBodySphericalHarmonicsGravitational" )
-                            + std::string( "AccelerationModel) to createTranslationalEquationsOfMotion ")
-                            + std::string( "EnvironmentUpdaterSettings" ) );
+                                    std::string( "Error, incompatible input (ThirdBodySphericalHarmonicsGravitational" )
+                                    + std::string( "AccelerationModel) to createTranslationalEquationsOfMotion ")
+                                    + std::string( "EnvironmentUpdaterSettings" ) );
                     }
                     break;
                 }
@@ -310,21 +406,21 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                     singleAccelerationUpdateNeeds[ spherical_harmonic_gravity_field_update ].push_back(
                                 acceleratedBodyIterator->first );
 
-                    boost::shared_ptr< gravitation::ThirdBodyMutualSphericalHarmonicsGravitationalAccelerationModel >
-                            thirdBodyAcceleration = boost::dynamic_pointer_cast<
+                    std::shared_ptr< gravitation::ThirdBodyMutualSphericalHarmonicsGravitationalAccelerationModel >
+                            thirdBodyAcceleration = std::dynamic_pointer_cast<
                             gravitation::ThirdBodyMutualSphericalHarmonicsGravitationalAccelerationModel >(
                                 accelerationModelIterator->second.at( i ) );
-                    if( thirdBodyAcceleration != NULL && translationalAccelerationModels.count(
+                    if( thirdBodyAcceleration != nullptr && translationalAccelerationModels.count(
                                 thirdBodyAcceleration->getCentralBodyName( ) ) == 0  )
                     {
-                        singleAccelerationUpdateNeeds[ body_transational_state_update ].push_back(
+                        singleAccelerationUpdateNeeds[ body_translational_state_update ].push_back(
                                     thirdBodyAcceleration->getCentralBodyName( ) );
                         singleAccelerationUpdateNeeds[ body_rotational_state_update ].push_back(
                                     thirdBodyAcceleration->getCentralBodyName( ) );
                         singleAccelerationUpdateNeeds[ spherical_harmonic_gravity_field_update ].push_back(
                                     thirdBodyAcceleration->getCentralBodyName( ) );
                     }
-                    else if( thirdBodyAcceleration == NULL )
+                    else if( thirdBodyAcceleration == nullptr )
                     {
                         throw std::runtime_error(
                                     std::string( "Error, incompatible input (ThirdBodyMutualSphericalHarmonicsGravitational" ) +
@@ -336,7 +432,7 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                 case thrust_acceleration:
                 {
                     std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > thrustModelUpdates =
-                            boost::dynamic_pointer_cast< propulsion::ThrustAcceleration >(
+                            std::dynamic_pointer_cast< propulsion::ThrustAcceleration >(
                                 accelerationModelIterator->second.at( i ) )->getRequiredModelUpdates( );
                     addEnvironmentUpdates( singleAccelerationUpdateNeeds, thrustModelUpdates );
 
@@ -347,27 +443,39 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                 }
                 case relativistic_correction_acceleration:
                 {
-                    boost::shared_ptr< relativity::RelativisticAccelerationCorrection >
-                            accelerationCorrection = boost::dynamic_pointer_cast< relativity::RelativisticAccelerationCorrection >(
+                    std::shared_ptr< relativity::RelativisticAccelerationCorrection >
+                            accelerationCorrection = std::dynamic_pointer_cast< relativity::RelativisticAccelerationCorrection >(
                                 accelerationModelIterator->second.at( i ) );
                     if( accelerationCorrection->getCalculateDeSitterCorrection( ) )
                     {
                         std::string primaryBody = accelerationCorrection->getPrimaryBodyName( );
                         if( translationalAccelerationModels.count(primaryBody ) == 0 )
                         {
-                            singleAccelerationUpdateNeeds[ body_transational_state_update ].push_back(
+                            singleAccelerationUpdateNeeds[ body_translational_state_update ].push_back(
                                         primaryBody );
                         }
                     }
                     break;
                 }
-                case direct_tidal_dissipation_acceleration:
+                case direct_tidal_dissipation_in_central_body_acceleration:
+                    singleAccelerationUpdateNeeds[ body_rotational_state_update ].push_back(
+                                accelerationModelIterator->first );
+                    singleAccelerationUpdateNeeds[ spherical_harmonic_gravity_field_update ].
+                            push_back( accelerationModelIterator->first );
+                    break;
+                case direct_tidal_dissipation_in_orbiting_body_acceleration:
                     singleAccelerationUpdateNeeds[ body_rotational_state_update ].push_back(
                                 accelerationModelIterator->first );
                     singleAccelerationUpdateNeeds[ spherical_harmonic_gravity_field_update ].
                             push_back( accelerationModelIterator->first );
                     break;
                 case empirical_acceleration:
+                    break;
+                case momentum_wheel_desaturation_acceleration:
+                    break;
+                case solar_sail_acceleration:
+                    singleAccelerationUpdateNeeds[ radiation_pressure_interface_update ].push_back( acceleratedBodyIterator->first );
+                    singleAccelerationUpdateNeeds[ body_mass_update ].push_back( acceleratedBodyIterator->first );
                     break;
                 default:
                     throw std::runtime_error( std::string( "Error when setting acceleration model update needs, model type not recognized: " ) +
@@ -376,9 +484,6 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
                 }
 
             }
-
-            // Check whether requested updates are possible.
-            checkValidityOfRequiredEnvironmentUpdates( singleAccelerationUpdateNeeds, bodyMap );
 
             // Add requested updates of current acceleration model to
             // full list of environment updates.
@@ -392,19 +497,19 @@ createTranslationalEquationsOfMotionEnvironmentUpdaterSettings(
 //! Get list of required environment model update settings from mass rate models.
 std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > >
 createMassPropagationEnvironmentUpdaterSettings(
-        const std::map< std::string, std::vector< boost::shared_ptr< basic_astrodynamics::MassRateModel > > > massRateModels,
+        const std::map< std::string, std::vector< std::shared_ptr< basic_astrodynamics::MassRateModel > > > massRateModels,
         const simulation_setup::NamedBodyMap& bodyMap )
 {
     using namespace basic_astrodynamics;
     using namespace propagators;
 
     std::map< propagators::EnvironmentModelsToUpdate,
-              std::vector< std::string > > environmentModelsToUpdate;
+            std::vector< std::string > > environmentModelsToUpdate;
     std::map< propagators::EnvironmentModelsToUpdate,
-              std::vector< std::string > > singleRateModelUpdateNeeds;
+            std::vector< std::string > > singleRateModelUpdateNeeds;
 
     // Iterate over all bodies with mass rate model.
-    for( std::map< std::string, std::vector< boost::shared_ptr< MassRateModel > > >::const_iterator massRateModelIterator =
+    for( std::map< std::string, std::vector< std::shared_ptr< MassRateModel > > >::const_iterator massRateModelIterator =
          massRateModels.begin( ); massRateModelIterator != massRateModels.end( ); massRateModelIterator++ )
     {
         for( unsigned int i = 0; i < massRateModelIterator->second.size( ); i++ )
@@ -426,9 +531,6 @@ createMassPropagationEnvironmentUpdaterSettings(
 
             }
 
-            // Check whether requested updates are possible.
-            checkValidityOfRequiredEnvironmentUpdates( singleRateModelUpdateNeeds, bodyMap );
-
             // Add requested updates of current acceleration model to
             // full list of environment updates.
             addEnvironmentUpdates( environmentModelsToUpdate, singleRateModelUpdateNeeds );
@@ -436,7 +538,341 @@ createMassPropagationEnvironmentUpdaterSettings(
     }
 
     return environmentModelsToUpdate;
+}
 
+//! Function to update environment to allow all required updates to be made
+void checkAndModifyEnvironmentForDependentVariableSaving(
+        const EnvironmentModelsToUpdate updateType,
+        const std::shared_ptr< SingleDependentVariableSaveSettings > dependentVariableSaveSettings,
+        const simulation_setup::NamedBodyMap& bodyMap )
+{
+    switch( updateType )
+    {
+    case vehicle_flight_conditions_update:
+        if( bodyMap.at( dependentVariableSaveSettings->associatedBody_ )->getFlightConditions( ) == nullptr )
+        {
+            if( ( bodyMap.at( dependentVariableSaveSettings->secondaryBody_ )->getAtmosphereModel( ) ) != nullptr &&
+                    ( bodyMap.at( dependentVariableSaveSettings->associatedBody_ )->getAerodynamicCoefficientInterface( ) != nullptr ) )
+            {
+                bodyMap.at( dependentVariableSaveSettings->associatedBody_ )->setFlightConditions(
+                            simulation_setup::createAtmosphericFlightConditions(
+                                bodyMap.at( dependentVariableSaveSettings->associatedBody_ ),
+                                bodyMap.at( dependentVariableSaveSettings->secondaryBody_ ),
+                                dependentVariableSaveSettings->associatedBody_,
+                                dependentVariableSaveSettings->secondaryBody_ ) );
+            }
+            else
+            {
+                bodyMap.at( dependentVariableSaveSettings->associatedBody_ )->setFlightConditions(
+                            simulation_setup::createFlightConditions(
+                                bodyMap.at( dependentVariableSaveSettings->associatedBody_ ),
+                                bodyMap.at( dependentVariableSaveSettings->secondaryBody_ ),
+                                dependentVariableSaveSettings->associatedBody_,
+                                dependentVariableSaveSettings->secondaryBody_ ) );
+            }
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+//! Function to create environment update settings for a single dependent variable
+std::map< propagators::EnvironmentModelsToUpdate,
+std::vector< std::string > > createEnvironmentUpdaterSettingsForDependentVariables(
+        const std::shared_ptr< SingleDependentVariableSaveSettings > dependentVariableSaveSettings,
+        const simulation_setup::NamedBodyMap& bodyMap )
+{
+    std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > >  variablesToUpdate;
+    switch( dependentVariableSaveSettings->dependentVariableType_ )
+    {
+    case mach_number_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case altitude_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case airspeed_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case local_density_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case relative_speed_dependent_variable:
+        if( dependentVariableSaveSettings->associatedBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        }
+        if( dependentVariableSaveSettings->secondaryBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        }
+        break;
+    case relative_position_dependent_variable:
+        if( dependentVariableSaveSettings->associatedBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        }
+        if( dependentVariableSaveSettings->secondaryBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        }
+        break;
+    case relative_distance_dependent_variable:
+        if( dependentVariableSaveSettings->associatedBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        }
+        if( dependentVariableSaveSettings->secondaryBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        }
+        break;
+    case relative_velocity_dependent_variable:
+        if( dependentVariableSaveSettings->associatedBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        }
+        if( dependentVariableSaveSettings->secondaryBody_ != "SSB" )
+        {
+            variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        }
+        break;
+    case total_acceleration_norm_dependent_variable:
+        break;
+    case single_acceleration_norm_dependent_variable:
+        break;
+    case total_acceleration_dependent_variable:
+        break;
+    case single_acceleration_dependent_variable:
+        break;
+    case aerodynamic_force_coefficients_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case aerodynamic_moment_coefficients_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case rotation_matrix_to_body_fixed_frame_variable:
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        break;
+    case intermediate_aerodynamic_rotation_matrix_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case relative_body_aerodynamic_orientation_angle_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case body_fixed_airspeed_based_velocity_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case total_aerodynamic_g_load_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case stagnation_point_heat_flux_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case local_temperature_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case local_dynamic_pressure_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case local_aerodynamic_heat_rate_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case geodetic_latitude_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case body_fixed_groundspeed_based_velocity_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case total_mass_rate_dependent_variables:
+        break;
+    case total_torque_norm_dependent_variable:
+        break;
+    case single_torque_norm_dependent_variable:
+        break;
+    case total_torque_dependent_variable:
+        break;
+    case single_torque_dependent_variable:
+        break;
+    case keplerian_state_dependent_variable:
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case modified_equinocial_state_dependent_variable:
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case spherical_harmonic_acceleration_terms_dependent_variable:
+        break;
+    case body_fixed_relative_cartesian_position:
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case body_fixed_relative_spherical_position:
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case euler_angles_to_body_fixed_313:
+        variablesToUpdate[ body_rotational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        break;
+    case lvlh_to_inertial_frame_rotation_dependent_variable:
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case control_surface_deflection_dependent_variable:
+        variablesToUpdate[ vehicle_flight_conditions_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        break;
+    case radiation_pressure_dependent_variable:
+        variablesToUpdate[ radiation_pressure_interface_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+        break;
+    case periapsis_altitude_dependent_variable:
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        variablesToUpdate[ body_translational_state_update ].push_back( dependentVariableSaveSettings->secondaryBody_ );
+    case total_gravity_field_variation_acceleration:
+        break;
+    case single_gravity_field_variation_acceleration:
+        break;
+    case single_gravity_field_variation_acceleration_terms:
+        break;
+    case acceleration_partial_wrt_body_translational_state:
+        break;
+    case current_body_mass_dependent_variable:
+        variablesToUpdate[ body_mass_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        break;
+    case radiation_pressure_coefficient_dependent_variable:
+        variablesToUpdate[ radiation_pressure_interface_update ].push_back( dependentVariableSaveSettings->associatedBody_ );
+        break;
+    default:
+        throw std::runtime_error( "Error when getting environment updates for dependent variables, parameter " +
+                                  std::to_string( dependentVariableSaveSettings->dependentVariableType_ ) + " not found." );
+    }
+
+    if( variablesToUpdate.count( vehicle_flight_conditions_update ) > 0 )
+    {
+        checkAndModifyEnvironmentForDependentVariableSaving(
+                    vehicle_flight_conditions_update, dependentVariableSaveSettings, bodyMap );
+    }
+
+    return variablesToUpdate;
+}
+
+//! Create environment update settings for dependent variables
+std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > createEnvironmentUpdaterSettings(
+        const std::shared_ptr< DependentVariableSaveSettings > dependentVariableSaveSettings,
+        const simulation_setup::NamedBodyMap& bodyMap )
+{
+    std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > environmentModelsToUpdate;
+
+    if( dependentVariableSaveSettings != nullptr )
+    {
+        std::vector< std::shared_ptr< SingleDependentVariableSaveSettings > > dependentVariableList =
+                dependentVariableSaveSettings->dependentVariables_;
+        for( unsigned int i = 0; i < dependentVariableList.size( ); i++ )
+        {
+            std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > currentEnvironmentModelsToUpdate =
+                    createEnvironmentUpdaterSettingsForDependentVariables( dependentVariableList.at( i ), bodyMap );
+            addEnvironmentUpdates( environmentModelsToUpdate, currentEnvironmentModelsToUpdate );
+        }
+    }
+    return environmentModelsToUpdate;
+}
+
+//! Create environment update settings for termination settings
+std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > createEnvironmentUpdaterSettings(
+        const std::shared_ptr< PropagationTerminationSettings > terminationSettings,
+        const simulation_setup::NamedBodyMap& bodyMap )
+{
+    std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > environmentModelsToUpdate;
+    switch( terminationSettings->terminationType_ )
+    {
+    case time_stopping_condition:
+        break;
+    case cpu_time_stopping_condition:
+        break;
+    case dependent_variable_stopping_condition:
+    {
+        std::shared_ptr< PropagationDependentVariableTerminationSettings > dependentVariableTerminationSettings =
+                std::dynamic_pointer_cast< PropagationDependentVariableTerminationSettings >( terminationSettings );
+        std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > >
+                environmentModelsToUpdateForSingleTerminationSetting =
+                createEnvironmentUpdaterSettingsForDependentVariables(
+                    dependentVariableTerminationSettings->dependentVariableSettings_, bodyMap );
+        addEnvironmentUpdates( environmentModelsToUpdate, environmentModelsToUpdateForSingleTerminationSetting );
+        break;
+    }
+    case hybrid_stopping_condition:
+    {
+        std::shared_ptr< PropagationHybridTerminationSettings > hybridTerminationSettings =
+                std::dynamic_pointer_cast< PropagationHybridTerminationSettings >( terminationSettings );
+        for( unsigned int i = 0; i < hybridTerminationSettings->terminationSettings_.size( ); i++ )
+        {
+            std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > >
+                    environmentModelsToUpdateForSingleTerminationSetting = createEnvironmentUpdaterSettings(
+                        hybridTerminationSettings->terminationSettings_.at( i ), bodyMap );
+            addEnvironmentUpdates( environmentModelsToUpdate, environmentModelsToUpdateForSingleTerminationSetting );
+        }
+        break;
+    }
+    case custom_stopping_condition:
+        break;
+    default:
+        throw std::runtime_error( "Error when creating environment updater settings for termination conditions, type not found" );
+    }
+
+    return environmentModelsToUpdate;
 }
 
 //! Function to create 'brute-force' update settings, in which each environment model is updated.
@@ -450,9 +886,9 @@ std::vector< std::string > > createFullEnvironmentUpdaterSettings(
     using namespace propagators;
 
     std::map< propagators::EnvironmentModelsToUpdate,
-              std::vector< std::string > > environmentModelsToUpdate;
+            std::vector< std::string > > environmentModelsToUpdate;
     std::map< propagators::EnvironmentModelsToUpdate,
-              std::vector< std::string > > singleAccelerationUpdateNeeds;
+            std::vector< std::string > > singleAccelerationUpdateNeeds;
 
     // Iterate over all bodies.
     for( simulation_setup::NamedBodyMap::const_iterator
@@ -463,20 +899,20 @@ std::vector< std::string > > createFullEnvironmentUpdaterSettings(
         // Check if current body is a vehicle.
 
         // Check if current body has flight conditions set.
-        if( bodyIterator->second ->getFlightConditions( ) != NULL )
+        if( bodyIterator->second ->getFlightConditions( ) != nullptr )
         {
             // If vehicle has flight conditions, add flight conditions update function to update list.
             singleAccelerationUpdateNeeds[ vehicle_flight_conditions_update ].
-                push_back( bodyIterator->first );
+                    push_back( bodyIterator->first );
         }
 
         // Get body radiation pressure interface(s) (one per source)
         std::map< std::string,
-                  boost::shared_ptr< RadiationPressureInterface > > radiationPressureInterfaces
-               = bodyIterator->second->getRadiationPressureInterfaces( );
+                std::shared_ptr< RadiationPressureInterface > > radiationPressureInterfaces
+                = bodyIterator->second->getRadiationPressureInterfaces( );
 
         // Add each interface update function to update list.
-        for( std::map< std::string, boost::shared_ptr< RadiationPressureInterface > >::iterator
+        for( std::map< std::string, std::shared_ptr< RadiationPressureInterface > >::iterator
              iterator = radiationPressureInterfaces.begin( );
              iterator != radiationPressureInterfaces.end( ); iterator++ )
         {
@@ -485,21 +921,21 @@ std::vector< std::string > > createFullEnvironmentUpdaterSettings(
         }
 
         // If body has rotation model, update rotational state in each time step.;
-        if( ( bodyIterator->second->getRotationalEphemeris( ) != NULL ) ||
-                ( bodyIterator->second->getDependentOrientationCalculator( ) != NULL ) )
+        if( ( bodyIterator->second->getRotationalEphemeris( ) != nullptr ) ||
+                ( bodyIterator->second->getDependentOrientationCalculator( ) != nullptr ) )
         {
             singleAccelerationUpdateNeeds[ body_rotational_state_update ].
-                push_back( bodyIterator->first );
+                    push_back( bodyIterator->first );
         }
 
 
-        boost::shared_ptr< TimeDependentSphericalHarmonicsGravityField > gravityField =
-                boost::dynamic_pointer_cast< TimeDependentSphericalHarmonicsGravityField >
+        std::shared_ptr< TimeDependentSphericalHarmonicsGravityField > gravityField =
+                std::dynamic_pointer_cast< TimeDependentSphericalHarmonicsGravityField >
                 ( bodyIterator->second->getGravityFieldModel( ) );
-        if( gravityField != NULL )
+        if( gravityField != nullptr )
         {
             singleAccelerationUpdateNeeds[ spherical_harmonic_gravity_field_update ].
-                push_back( bodyIterator->first );
+                    push_back( bodyIterator->first );
         }
 
         singleAccelerationUpdateNeeds[ body_mass_update ].push_back( bodyIterator->first );
@@ -512,7 +948,30 @@ std::vector< std::string > > createFullEnvironmentUpdaterSettings(
     }
     return environmentModelsToUpdate;
 }
+template std::shared_ptr< propagators::EnvironmentUpdater< double, double > > createEnvironmentUpdaterForDynamicalEquations< double, double >(
+        const std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings,
+        const simulation_setup::NamedBodyMap& bodyMap );
 
+template std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > createEnvironmentUpdaterSettings< double >(
+        const std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings,
+        const simulation_setup::NamedBodyMap& bodyMap,
+        const bool isPartOfMultiTypePropagation );
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+template std::shared_ptr< propagators::EnvironmentUpdater< double, Time > > createEnvironmentUpdaterForDynamicalEquations< double, Time >(
+        const std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings,
+        const simulation_setup::NamedBodyMap& bodyMap );
+template std::shared_ptr< propagators::EnvironmentUpdater< long double, double > > createEnvironmentUpdaterForDynamicalEquations< long double, double >(
+        const std::shared_ptr< SingleArcPropagatorSettings< long double > > propagatorSettings,
+        const simulation_setup::NamedBodyMap& bodyMap );
+template std::shared_ptr< propagators::EnvironmentUpdater< long double, Time > > createEnvironmentUpdaterForDynamicalEquations< long double, Time >(
+        const std::shared_ptr< SingleArcPropagatorSettings< long double > > propagatorSettings,
+        const simulation_setup::NamedBodyMap& bodyMap );
+template std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > createEnvironmentUpdaterSettings< long double >(
+        const std::shared_ptr< SingleArcPropagatorSettings< long double > > propagatorSettings,
+        const simulation_setup::NamedBodyMap& bodyMap,
+        const bool isPartOfMultiTypePropagation );
+#endif
 } // namespace propagators
 
 } // namespace tudat

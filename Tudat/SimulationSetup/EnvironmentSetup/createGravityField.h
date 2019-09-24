@@ -16,7 +16,7 @@
 #include <string>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "Tudat/SimulationSetup/EnvironmentSetup/body.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/createGravityFieldVariations.h"
@@ -139,6 +139,14 @@ public:
      *  \return Gravitational parameter for gravity field.
      */
     double getGravitationalParameter( ){ return gravitationalParameter_; }
+
+    //! Function to reset gravitational parameter for gravity field.
+    /*!
+     *  Function to reset gravitational parameter for gravity field.
+     *  \param gravitationalParameter New gravitational parameter for gravity field.
+     */
+    void resetGravitationalParameter( const double gravitationalParameter )
+    { gravitationalParameter_ = gravitationalParameter; }
 
     //! Function to return reference radius of spherical harmonic field expansion
     /*!
@@ -271,14 +279,13 @@ public:
      * \param referenceRadius Reference radius of gravity field to be used if file has no header.
      */
     FromFileSphericalHarmonicsGravityFieldSettings( const std::string& filePath,
-                                                 const std::string& associatedReferenceFrame,
-                                                 const int maximumDegree,
-                                                 const int maximumOrder,
-                                                 const int gravitationalParameterIndex,
-                                                 const int referenceRadiusIndex,
-                                                 const double gravitationalParameter = TUDAT_NAN,
-                                                 const double referenceRadius = TUDAT_NAN );
-
+                                                    const std::string& associatedReferenceFrame,
+                                                    const int maximumDegree,
+                                                    const int maximumOrder,
+                                                    const int gravitationalParameterIndex,
+                                                    const int referenceRadiusIndex,
+                                                    const double gravitationalParameter = TUDAT_NAN,
+                                                    const double referenceRadius = TUDAT_NAN );
     //! Constructor with model included in Tudat.
     /*!
      * Constructor with model included in Tudat.
@@ -384,7 +391,7 @@ protected:
  * the coefficients are referred.
  * \return Gravity field settings for a homogeneous triaxial ellipsoid of given properties.
  */
-boost::shared_ptr< SphericalHarmonicsGravityFieldSettings > createHomogeneousTriAxialEllipsoidGravitySettings(
+std::shared_ptr< SphericalHarmonicsGravityFieldSettings > createHomogeneousTriAxialEllipsoidGravitySettings(
         const double axisA, const double axisB, const double axisC, const double ellipsoidDensity,
         const int maximumDegree, const int maximumOrder,
         const std::string& associatedReferenceFrame  );
@@ -426,12 +433,12 @@ std::pair< double, double > readGravityFieldFile(
  *  that are to be used (but not immediately set!) by current body under consideration.
  *  \return Gravity field model created according to settings in gravityFieldSettings.
  */
-boost::shared_ptr< gravitation::GravityFieldModel > createGravityFieldModel(
-        const boost::shared_ptr< GravityFieldSettings > gravityFieldSettings,
+std::shared_ptr< gravitation::GravityFieldModel > createGravityFieldModel(
+        const std::shared_ptr< GravityFieldSettings > gravityFieldSettings,
         const std::string& body,
         const NamedBodyMap& bodyMap = NamedBodyMap( ),
-        const std::vector< boost::shared_ptr< GravityFieldVariationSettings > >& gravityFieldVariationSettings =
-        std::vector< boost::shared_ptr< GravityFieldVariationSettings > >( ) );
+        const std::vector< std::shared_ptr< GravityFieldVariationSettings > >& gravityFieldVariationSettings =
+        std::vector< std::shared_ptr< GravityFieldVariationSettings > >( ) );
 
 } // namespace simulation_setup
 

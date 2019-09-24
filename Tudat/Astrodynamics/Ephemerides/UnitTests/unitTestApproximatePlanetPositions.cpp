@@ -78,7 +78,7 @@ BOOST_AUTO_TEST_CASE( testOrbitalElements )
     TUDAT_CHECK_MATRIX_CLOSE_FRACTION( expectedEphemeris, marsState, tolerance );
 
     // Check that the reference frame properties are as expected.
-    BOOST_CHECK_EQUAL( marsEphemeris.getReferenceFrameOrientation( ), "J2000" );
+    BOOST_CHECK_EQUAL( marsEphemeris.getReferenceFrameOrientation( ), "ECLIPJ2000" );
     BOOST_CHECK_EQUAL( marsEphemeris.getReferenceFrameOrigin( ), "Sun" );
 }
 
@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE( testCircularCoplannar )
     Eigen::Vector6d keplerianElementsCircularCoplanar;
     keplerianElementsCircularCoplanar = orbital_element_conversions::
             convertCartesianToKeplerianElements( marsStateCircularCoplanar,
-                    marsEphemeris.getSunGravitationalParameter( ) );
+                    marsEphemeris.getSunGravitationalParameter( ) + marsEphemeris.getPlanetGravitationalParameter( ) );
 
     // Check the eccentricity, inclination and z-component of velocity and position are 0.
     BOOST_CHECK_SMALL( keplerianElementsCircularCoplanar( 1 ), 1e-15 );
@@ -109,7 +109,7 @@ BOOST_AUTO_TEST_CASE( testCircularCoplannar )
                        std::numeric_limits< double >::min( ) );
 
     // Check that the reference frame properties are as expected.
-    BOOST_CHECK_EQUAL( marsEphemeris.getReferenceFrameOrientation( ), "J2000" );
+    BOOST_CHECK_EQUAL( marsEphemeris.getReferenceFrameOrientation( ), "ECLIPJ2000" );
     BOOST_CHECK_EQUAL( marsEphemeris.getReferenceFrameOrigin( ), "Sun" );
 }
 

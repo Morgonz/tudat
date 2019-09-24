@@ -21,8 +21,7 @@ namespace estimatable_parameters
 
 //! Interface class for the estimation of an initial translational state.
 template< typename InitialStateParameterType = double >
-class InitialTranslationalStateParameter: public EstimatableParameter<
-        Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > >
+class InitialTranslationalStateParameter: public EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > >
 {
 public:
 
@@ -82,6 +81,16 @@ public:
     std::string getCentralBody( )
     {
         return centralBody_;
+    }
+
+    //! Function to get the orientation of the frame in which the state is defined.
+    /*!
+     * Function to get the orientation of the frame in which the state is defined.
+     * \return Orientation of the frame in which the state is defined.
+     */
+    std::string getFrameOrientation( )
+    {
+        return frameOrientation_;
     }
 
 private:
@@ -252,10 +261,10 @@ private:
  */
 template< typename InitialStateParameterType = double >
 int getSingleArcParameterSetSize(
-        boost::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameterSet )
+        std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameterSet )
 {
     int totalParameterSetSize = estimatableParameterSet->getEstimatedParameterSetSize( );
-    std::vector< boost::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
+    std::vector< std::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
             initialStateParameters = estimatableParameterSet->getEstimatedInitialStateParameters( );
 
     for( unsigned int i = 0; i < initialStateParameters.size( ); i++ )
@@ -263,10 +272,11 @@ int getSingleArcParameterSetSize(
         if( initialStateParameters.at( i )->getParameterName( ).first == arc_wise_initial_body_state )
         {
             totalParameterSetSize -=
-                    ( boost::dynamic_pointer_cast< ArcWiseInitialTranslationalStateParameter< InitialStateParameterType > >(
+                    ( std::dynamic_pointer_cast< ArcWiseInitialTranslationalStateParameter< InitialStateParameterType > >(
                         initialStateParameters.at( i ) )->getNumberOfStateArcs( ) - 1 ) * 6;
         }
-        else if( ( initialStateParameters.at( i )->getParameterName( ).first != initial_body_state ) )
+        else if( ( initialStateParameters.at( i )->getParameterName( ).first != initial_body_state ) &&
+                 ( initialStateParameters.at( i )->getParameterName( ).first != initial_rotational_body_state ))
         {
             throw std::runtime_error(
                         "Error when getting single arc paramater vector, did not recognize initial state parameter " +
@@ -284,7 +294,7 @@ int getSingleArcParameterSetSize(
  */
 template< typename InitialStateParameterType = double >
 int getSingleArcInitialDynamicalStateParameterSetSize(
-        boost::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameterSet )
+        std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameterSet )
 {
     return getSingleArcParameterSetSize( estimatableParameterSet ) -
             ( estimatableParameterSet->getEstimatedParameterSetSize( ) -
@@ -296,14 +306,17 @@ int getSingleArcInitialDynamicalStateParameterSetSize(
  *  Function to get arc start times from list of estimated parameters. Function throws an error if multiple arc-wise
  *  estimations are found, but arc times are not compatible
  *  \param estimatableParameters List of estimated parameters
+ *  \param throwErrorOnSingleArcDynamics Boolean denoting whether to throw an exception if single arc dynamics are used (default true)
  *  \return Start times for estimation arcs
  */
 template< typename InitialStateParameterType >
 std::vector< double > getMultiArcStateEstimationArcStartTimes(
-        const boost::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameters )
+        const std::shared_ptr< EstimatableParameterSet< InitialStateParameterType > > estimatableParameters,
+        const bool throwErrorOnSingleArcDynamics = true )
+
 {
     // Retrieve initial dynamical parameters.
-    std::vector< boost::shared_ptr< EstimatableParameter<
+    std::vector< std::shared_ptr< EstimatableParameter<
             Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > > initialDynamicalParameters =
             estimatableParameters->getEstimatedInitialStateParameters( );
 
@@ -314,10 +327,10 @@ std::vector< double > getMultiArcStateEstimationArcStartTimes(
     {
         if( initialDynamicalParameters.at( i )->getParameterName( ).first == arc_wise_initial_body_state )
         {
-            boost::shared_ptr< ArcWiseInitialTranslationalStateParameter< InitialStateParameterType > > arcWiseStateParameter =
-            boost::dynamic_pointer_cast< ArcWiseInitialTranslationalStateParameter< InitialStateParameterType > >(
+            std::shared_ptr< ArcWiseInitialTranslationalStateParameter< InitialStateParameterType > > arcWiseStateParameter =
+            std::dynamic_pointer_cast< ArcWiseInitialTranslationalStateParameter< InitialStateParameterType > >(
                         initialDynamicalParameters.at( i ) );
-            if( arcWiseStateParameter == NULL )
+            if( arcWiseStateParameter == nullptr )
             {
                 throw std::runtime_error( "Error when getting arc times from estimated parameters, parameter is inconsistent" );
             }
@@ -351,7 +364,10 @@ std::vector< double > getMultiArcStateEstimationArcStartTimes(
         }
         else
         {
+            if( throwErrorOnSingleArcDynamics )
+            {
             throw std::runtime_error( "Error when getting arc times from estimated parameters, soingle arc dynamics found" );
+            }
         }
     }
 

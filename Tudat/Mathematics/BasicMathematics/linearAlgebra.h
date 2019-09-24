@@ -7,6 +7,8 @@
  *    a copy of the license with this file. If not, please or visit:
  *    http://tudat.tudelft.nl/LICENSE.
  *
+ *    References:
+ *      Ogata, K., Discrete-Time Control Systems, 2nd ed. Pearson Education Asia, 2002.
  */
 
 #ifndef TUDAT_LINEAR_ALGEBRA_H
@@ -14,26 +16,52 @@
 
 #include <map>
 
-#include <boost/function.hpp>
+#include <functional>
+#include <vector>
 
 #include <Eigen/Core>
 #include <Eigen/SVD>
 #include <Eigen/Geometry>
 
 #include "Tudat/Basics/basicTypedefs.h"
+
 namespace tudat
 {
 
 namespace linear_algebra
 {
 
-//! Function to put a quaternion in 'vector format', e.g. a Vector4d with entries (w,x,y,z) of the quaternion
+//! Function to put a quaternion in 'vector format', e.g. a Vector4d with entries (w,x,y,z) of the quaternion.
 /*!
- * Function to put a quaternion in 'vector format', e.g. a Vector4d with entries (w,x,y,z) of the quaternion
+ * Function to put a quaternion in 'vector format', e.g. a Vector4d with entries (w,x,y,z) of the quaternion.
  * \param quaternion Quaternion that is to be put into vector format.
- * \return Vector format of input quaternion
+ * \return Vector format of input quaternion.
  */
 Eigen::Vector4d convertQuaternionToVectorFormat( const Eigen::Quaterniond& quaternion );
+
+//! Function to put a vector in 'quaternion format', i.e. a Quaterniond.
+/*!
+ * Function to put a vector in 'quaternion format', i.e. a Quaterniond.
+ * \param vector Vector format of input quaternion.
+ * \return Quaternion that is to be put into vector format.
+ */
+Eigen::Quaterniond convertVectorToQuaternionFormat( const Eigen::Vector4d& vector );
+
+//! Function to take the product of two quaternions.
+/*!
+ *  Function to take the product of two quaternions, both expressed as vectors.
+ *  \param firstQuaternion First quaternion expressed as vector.
+ *  \param secondQuaternion Second quaternion expressed as vector.
+ *  \return Product of the two quaternions.
+ */
+Eigen::Vector4d quaternionProduct( const Eigen::Vector4d& firstQuaternion, const Eigen::Vector4d& secondQuaternion );
+
+//! Function to invert a quaternion.
+/*!
+ *  Function to invert a quaternion.
+ *  \param quaternionVector Quaternion expressed as vector.
+ */
+void invertQuaternion( Eigen::Vector4d& quaternionVector );
 
 //! Function that returns that 'cross-product matrix'
 /*!
@@ -104,7 +132,7 @@ double getVectorNorm( const Eigen::Vector3d& vector );
  * \param vectorFunction Function returning the vector for which the norm is to be computed
  * \return Vector norm
  */
-double getVectorNormFromFunction( const boost::function< Eigen::Vector3d( ) > vectorFunction );
+double getVectorNormFromFunction( const std::function< Eigen::Vector3d( ) > vectorFunction );
 
 //! Flip matrix rows.
 /*!
@@ -129,7 +157,7 @@ static inline void flipMatrixRows( Eigen::MatrixXd& matrixToFlip )
 }
 
 Eigen::Vector3d evaluateSecondBlockInStateVector(
-        const boost::function< Eigen::Vector6d( const double ) > stateFunction,
+        const std::function< Eigen::Vector6d( const double ) > stateFunction,
         const double time );
 
 double computeNormOfVectorDifference( const Eigen::Vector3d& vector0,
@@ -178,6 +206,16 @@ bool doesMatrixHaveNanEntries( const Eigen::Matrix< StateScalarType, NumberOfRow
  * \return RMS of input vector
  */
 double getVectorEntryRootMeanSquare( const Eigen::VectorXd& inputVector );
+
+//! Function to compute the partial derivative of a rotation matrix w.r.t. its associated quaterion elements
+/*!
+ * Function to compute the partial derivative of a rotation matrix w.r.t. its associated quaterion elements
+ * \param quaternionVector Rotation quaternion in vector format
+ * \param partialDerivatives List of required partial derivatives (returned by reference)
+ */
+void computePartialDerivativeOfRotationMatrixWrtQuaternion(
+        const Eigen::Vector4d quaternionVector,
+        std::vector< Eigen::Matrix3d >& partialDerivatives );
 
 
 } // namespace linear_algebra

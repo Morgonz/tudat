@@ -12,7 +12,7 @@
 #ifndef TUDAT_FUNCTION_H
 #define TUDAT_FUNCTION_H
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 namespace tudat
 {
@@ -69,6 +69,7 @@ public:
     virtual DependentVariable computeDefiniteIntegral( const unsigned int order,
                                                        const IndependentVariable lowerBound,
                                                        const IndependentVariable upperbound ) = 0;
+
 };
 
 //! Typedef for shared-pointer to Function object.
@@ -76,7 +77,7 @@ public:
  * Typedef for shared-pointer to Function object with IndependentVariable=double,
  * DependentVariable=double.
  */
-typedef boost::shared_ptr< Function< > > FunctionPointer;
+typedef std::shared_ptr< Function< > > FunctionPointer;
 
 } // namespace basic_mathematics
 } // namespace tudat

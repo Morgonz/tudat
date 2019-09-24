@@ -29,7 +29,7 @@
 #include "Tudat/SimulationSetup/PropagationSetup/dynamicsSimulator.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/defaultBodies.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/createBodies.h"
-#include "Tudat/SimulationSetup/PropagationSetup/createNumericalSimulator.h"
+#include "Tudat/SimulationSetup/EstimationSetup/createNumericalSimulator.h"
 #include "Tudat/Mathematics/NumericalIntegrators/createNumericalIntegrator.h"
 
 namespace tudat
@@ -67,7 +67,6 @@ BOOST_AUTO_TEST_CASE( testEnckePopagatorForSphericalHarmonicCentralBodies )
                 using namespace orbital_element_conversions;
                 using namespace basic_mathematics;
                 using namespace gravitation;
-                using namespace numerical_integrators;
 
                 // Load Spice kernels.
                 spice_interface::loadStandardSpiceKernels( );
@@ -97,7 +96,7 @@ BOOST_AUTO_TEST_CASE( testEnckePopagatorForSphericalHarmonicCentralBodies )
                 bodiesToCreate.push_back( "Moon" );
 
                 // Create body objects.
-                std::map< std::string, boost::shared_ptr< BodySettings > > bodySettings;
+                std::map< std::string, std::shared_ptr< BodySettings > > bodySettings;
                 if( direction == 0 )
                 {
                     bodySettings =
@@ -111,11 +110,12 @@ BOOST_AUTO_TEST_CASE( testEnckePopagatorForSphericalHarmonicCentralBodies )
                 NamedBodyMap bodyMap = createBodies( bodySettings );
 
                 // Create spacecraft object.
-                bodyMap[ "Vehicle" ] = boost::make_shared< simulation_setup::Body >( );
+                bodyMap[ "Vehicle" ] = std::make_shared< simulation_setup::Body >( );
                 bodyMap[ "Vehicle" ]->setConstantBodyMass( 400.0 );
-                bodyMap[ "Vehicle" ]->setEphemeris( boost::make_shared< ephemerides::TabulatedCartesianEphemeris< > >(
-                                                        boost::shared_ptr< interpolators::OneDimensionalInterpolator
+                bodyMap[ "Vehicle" ]->setEphemeris( std::make_shared< ephemerides::TabulatedCartesianEphemeris< > >(
+                                                        std::shared_ptr< interpolators::OneDimensionalInterpolator
                                                         < double, Eigen::Vector6d  > >( ), "Earth", "ECLIPJ2000" ) );
+
 
 
                 // Finalize body creation.
@@ -127,18 +127,18 @@ BOOST_AUTO_TEST_CASE( testEnckePopagatorForSphericalHarmonicCentralBodies )
                 std::vector< std::string > centralBodies;
 
                 // Define propagation settings.
-                std::map< std::string, std::vector< boost::shared_ptr< AccelerationSettings > > > accelerationsOfVehicle;
+                std::map< std::string, std::vector< std::shared_ptr< AccelerationSettings > > > accelerationsOfVehicle;
 
                 {
-                    accelerationsOfVehicle[ "Earth" ].push_back( boost::make_shared< AccelerationSettings >(
+                    accelerationsOfVehicle[ "Earth" ].push_back( std::make_shared< AccelerationSettings >(
                                                                      basic_astrodynamics::central_gravity ) );
-                    accelerationsOfVehicle[ "Sun" ].push_back( boost::make_shared< AccelerationSettings >(
+                    accelerationsOfVehicle[ "Sun" ].push_back( std::make_shared< AccelerationSettings >(
                                                                    basic_astrodynamics::central_gravity ) );
-                    accelerationsOfVehicle[ "Moon" ].push_back( boost::make_shared< AccelerationSettings >(
+                    accelerationsOfVehicle[ "Moon" ].push_back( std::make_shared< AccelerationSettings >(
                                                                     basic_astrodynamics::central_gravity ) );
                 }
 
-                accelerationMap[  "Vehicle" ] = accelerationsOfVehicle;
+                accelerationMap[ "Vehicle" ] = accelerationsOfVehicle;
                 bodiesToPropagate.push_back( "Vehicle" );
                 centralBodies.push_back( "Earth" );
                 basic_astrodynamics::AccelerationMap accelerationModelMap = createAccelerationModelsMap(
@@ -160,10 +160,10 @@ BOOST_AUTO_TEST_CASE( testEnckePopagatorForSphericalHarmonicCentralBodies )
                             vehicleInitialStateInKeplerianElements, earthGravitationalParameter );
 
                 // Define propagator settings (Cowell)
-                boost::shared_ptr< PropagationTerminationSettings > terminationSettings;
-                std::vector< boost::shared_ptr< SingleDependentVariableSaveSettings > > dependentVariables;
+                std::shared_ptr< PropagationTerminationSettings > terminationSettings;
+                std::vector< std::shared_ptr< SingleDependentVariableSaveSettings > > dependentVariables;
                 dependentVariables.push_back(
-                            boost::make_shared< SingleDependentVariableSaveSettings >( relative_distance_dependent_variable,
+                            std::make_shared< SingleDependentVariableSaveSettings >( relative_distance_dependent_variable,
                                                                                        "Vehicle", "Earth" ) );
                 double finalTestTime;
                 double secondFinalTestTime;
@@ -180,75 +180,73 @@ BOOST_AUTO_TEST_CASE( testEnckePopagatorForSphericalHarmonicCentralBodies )
                 }
                 if( simulationCase == 0 )
                 {
-                    terminationSettings = boost::make_shared< PropagationTimeTerminationSettings >(
+                    terminationSettings = std::make_shared< PropagationTimeTerminationSettings >(
                                 simulationEndEpoch - directionMultiplier * 4.5, true );
                 }
                 else if( simulationCase == 1 )
                 {
-                    terminationSettings = boost::make_shared< PropagationDependentVariableTerminationSettings >(
+                    terminationSettings = std::make_shared< PropagationDependentVariableTerminationSettings >(
                                 dependentVariables.at( 0 ), 8.7E6, false, true,
-                                boost::make_shared< root_finders::RootFinderSettings >(
+                                std::make_shared< root_finders::RootFinderSettings >(
                                     root_finders::bisection_root_finder, 1.0E-6, 100 ) );
                 }
                 else if( simulationCase == 2 )
                 {
-                    std::vector< boost::shared_ptr< PropagationTerminationSettings > > terminationSettingsList;
+                    std::vector< std::shared_ptr< PropagationTerminationSettings > > terminationSettingsList;
                     terminationSettingsList.push_back(
-                                boost::make_shared< PropagationTimeTerminationSettings >( finalTestTime, true ) );
+                                std::make_shared< PropagationTimeTerminationSettings >( finalTestTime, true ) );
                     terminationSettingsList.push_back(
-                                boost::make_shared< PropagationDependentVariableTerminationSettings >(
+                                std::make_shared< PropagationDependentVariableTerminationSettings >(
                                     dependentVariables.at( 0 ), 8.7E6, false, true,
-                                    boost::make_shared< root_finders::RootFinderSettings >(
+                                    std::make_shared< root_finders::RootFinderSettings >(
                                         root_finders::bisection_root_finder, 1.0E-6, 100 ) ) );
-                    terminationSettings = boost::make_shared< PropagationHybridTerminationSettings >(
+                    terminationSettings = std::make_shared< PropagationHybridTerminationSettings >(
                                 terminationSettingsList, true );
                 }
                 else if( simulationCase == 3 )
                 {
-                    std::vector< boost::shared_ptr< PropagationTerminationSettings > > terminationSettingsList;
+                    std::vector< std::shared_ptr< PropagationTerminationSettings > > terminationSettingsList;
                     terminationSettingsList.push_back(
-                                boost::make_shared< PropagationTimeTerminationSettings >( finalTestTime, true ) );
+                                std::make_shared< PropagationTimeTerminationSettings >( finalTestTime, true ) );
                     terminationSettingsList.push_back(
-                                boost::make_shared< PropagationDependentVariableTerminationSettings >(
+                                std::make_shared< PropagationDependentVariableTerminationSettings >(
                                     dependentVariables.at( 0 ), 8.7E6, false, true,
-                                    boost::make_shared< root_finders::RootFinderSettings >(
+                                    std::make_shared< root_finders::RootFinderSettings >(
                                         root_finders::bisection_root_finder, 1.0E-6, 100 ) ) );
-                    terminationSettings = boost::make_shared< PropagationHybridTerminationSettings >(
+                    terminationSettings = std::make_shared< PropagationHybridTerminationSettings >(
                                 terminationSettingsList, false );
                 }
                 else if( simulationCase == 4 )
                 {
-                    std::vector< boost::shared_ptr< PropagationTerminationSettings > > terminationSettingsList;
+                    std::vector< std::shared_ptr< PropagationTerminationSettings > > terminationSettingsList;
                     terminationSettingsList.push_back(
-                                boost::make_shared< PropagationTimeTerminationSettings >( secondFinalTestTime, true ) );
+                                std::make_shared< PropagationTimeTerminationSettings >( secondFinalTestTime, true ) );
                     terminationSettingsList.push_back(
-                                boost::make_shared< PropagationDependentVariableTerminationSettings >(
+                                std::make_shared< PropagationDependentVariableTerminationSettings >(
                                     dependentVariables.at( 0 ), 8.7E6, false, true,
-                                    boost::make_shared< root_finders::RootFinderSettings >(
+                                    std::make_shared< root_finders::RootFinderSettings >(
                                         root_finders::bisection_root_finder, 1.0E-6, 100 ) ) );
-                    terminationSettings = boost::make_shared< PropagationHybridTerminationSettings >(
+                    terminationSettings = std::make_shared< PropagationHybridTerminationSettings >(
                                 terminationSettingsList, false );
                 }
 
-
-                boost::shared_ptr< TranslationalStatePropagatorSettings< double > > propagatorSettings =
-                        boost::make_shared< TranslationalStatePropagatorSettings< double > >
+                std::shared_ptr< TranslationalStatePropagatorSettings< double > > propagatorSettings =
+                        std::make_shared< TranslationalStatePropagatorSettings< double > >
                         ( centralBodies, accelerationModelMap, bodiesToPropagate, vehicleInitialState, terminationSettings, cowell,
-                          boost::make_shared< DependentVariableSaveSettings >( dependentVariables ) );
+                          std::make_shared< DependentVariableSaveSettings >( dependentVariables ) );
 
                 // Define integrator settings.
                 const double fixedStepSize = 5.0;
-                boost::shared_ptr< IntegratorSettings< > > integratorSettings;
+                std::shared_ptr< IntegratorSettings< > > integratorSettings;
                 if( integratorCase == 0 )
                 {
-                    integratorSettings = boost::make_shared< IntegratorSettings< > >
+                    integratorSettings = std::make_shared< IntegratorSettings< > >
                             ( rungeKutta4, simulationStartEpoch, directionMultiplier * fixedStepSize );
-
                 }
                 else
                 {
-                    integratorSettings = boost::make_shared< RungeKuttaVariableStepSizeSettings< double > >
-                            ( rungeKuttaVariableStepSize, simulationStartEpoch, directionMultiplier * fixedStepSize,
+                    integratorSettings = std::make_shared< RungeKuttaVariableStepSizeSettings< double > >
+                            ( simulationStartEpoch, directionMultiplier * fixedStepSize,
                               RungeKuttaCoefficients::CoefficientSets::rungeKuttaFehlberg45,
                               1.0E-3, 1.0E3, 1.0E-12, 1.0E-12 );
                 }
@@ -345,18 +343,6 @@ BOOST_AUTO_TEST_CASE( testEnckePopagatorForSphericalHarmonicCentralBodies )
                         BOOST_CHECK_EQUAL( ( dependentVariableHistory.begin( )->second( 0 ) - 8.7E6 ) > 100.0, true );
                     }
                 }
-
-                //                std::cout<<"First time/altitude: "<<std::setprecision( 12 )<<dependentVariableHistory.begin( )->first<<" "<<
-                //                           dependentVariableHistory.begin( )->second<<std::endl;
-                //                std::cout<<"Final time/altitude: "<<std::setprecision( 12 )<<dependentVariableHistory.rbegin( )->first<<" "<<
-                //                           dependentVariableHistory.rbegin( )->second<<std::endl;
-                //                std::cout<<"Final time/state: "<<std::setprecision( 12 )<<stateHistory.rbegin( )->first<<" "<<
-                //                           stateHistory.rbegin( )->second.transpose( )<<std::endl;
-                //                for( std::map< double, Eigen::VectorXd >::const_iterator it = dependentVariableHistory.begin( );
-                //                     it != dependentVariableHistory.end( ); it++ )
-                //                {
-                //                    std::cout<<"Time/altitude: "<<it->first<<" "<<it->second<<std::endl;
-                //                }
             }
         }
     }

@@ -27,9 +27,13 @@ namespace basic_astrodynamics
  */
 enum AvailableTorque
 {
+    torque_free = -2,
     underfined_torque = -1,
     second_order_gravitational_torque = 0,
-    aerodynamic_torque = 1
+    aerodynamic_torque = 1,
+    spherical_harmonic_gravitational_torque = 2,
+    inertial_torque = 3,
+    dissipative_torque = 4
 };
 
 //! Function to identify the derived class type of a torque model.
@@ -40,7 +44,7 @@ enum AvailableTorque
  *  \return Type of the torqueModel, as identified by AvailableTorque enum.
  */
 AvailableTorque getTorqueModelType(
-        boost::shared_ptr< basic_astrodynamics::TorqueModel > torqueModel );
+        std::shared_ptr< basic_astrodynamics::TorqueModel > torqueModel );
 
 //! Function to get a string representing a 'named identification' of an torque type
 /*!
@@ -57,12 +61,12 @@ std::string getTorqueModelName( const AvailableTorque torqueType );
  * \param modelType Type for which all models are to be retrieved
  * \return Subset of fullList for which the torque model type is modelType
  */
-std::vector< boost::shared_ptr< TorqueModel > > getTorqueModelsOfType(
-        const std::vector< boost::shared_ptr< TorqueModel > >& fullList,
+std::vector< std::shared_ptr< TorqueModel > > getTorqueModelsOfType(
+        const std::vector< std::shared_ptr< TorqueModel > >& fullList,
         const AvailableTorque modelType );
-}
 
 }
 
+}
 
 #endif // TUDAT_TORQUEMODELTYPES_H

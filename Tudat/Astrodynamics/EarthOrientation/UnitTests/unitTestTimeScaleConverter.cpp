@@ -139,7 +139,7 @@ BOOST_AUTO_TEST_CASE( testDifferentTimeScaleConversions )
     SofaTimeOutput sofaTimes = getSofaDirectTimes( );
 
     // Create default time converter.
-    boost::shared_ptr< TerrestrialTimeScaleConverter > timeScaleConverter =
+    std::shared_ptr< TerrestrialTimeScaleConverter > timeScaleConverter =
             createStandardEarthOrientationCalculator( )->getTerrestrialTimeScaleConverter( );
 
     // Set station position
@@ -257,9 +257,9 @@ BOOST_AUTO_TEST_CASE( testDifferentTimeScaleConversions )
 BOOST_AUTO_TEST_CASE( testTimeScaleConversionPrecisionWithTimeType )
 {
     // Create time scale converters
-    boost::shared_ptr< TerrestrialTimeScaleConverter > timeScaleConverter =
+    std::shared_ptr< TerrestrialTimeScaleConverter > timeScaleConverter =
             createStandardEarthOrientationCalculator( )->getTerrestrialTimeScaleConverter( );
-    boost::shared_ptr< TerrestrialTimeScaleConverter > comparisonTimeScaleConverter =
+    std::shared_ptr< TerrestrialTimeScaleConverter > comparisonTimeScaleConverter =
             createStandardEarthOrientationCalculator( )->getTerrestrialTimeScaleConverter( );
 
     // Define time scales
@@ -302,7 +302,6 @@ BOOST_AUTO_TEST_CASE( testTimeScaleConversionPrecisionWithTimeType )
                         originScales.at( j ), originScales.at( i ), currentTimes[ originScales.at( j ) ],
                     stationCartesianPosition );
             BOOST_CHECK_SMALL( std::fabs( static_cast< long double >( currentBackConvertedTime - baseTime ) ), 1.0E-12L );
-            std::cout << i << " " << j << " " << std::fabs( static_cast< long double >( currentBackConvertedTime - baseTime ) ) << std::endl;
         }
     }
 }
@@ -310,7 +309,7 @@ BOOST_AUTO_TEST_CASE( testTimeScaleConversionPrecisionWithTimeType )
 //! Test validity of time scale converter around leap seconds
 BOOST_AUTO_TEST_CASE( testTimeScaleConversionDuringLeapSeconds )
 {
-    boost::shared_ptr< TerrestrialTimeScaleConverter > timeScaleConverter =
+    std::shared_ptr< TerrestrialTimeScaleConverter > timeScaleConverter =
             createStandardEarthOrientationCalculator( )->getTerrestrialTimeScaleConverter( );
 
     // Define leap second list (day, month, year)

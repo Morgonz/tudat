@@ -11,6 +11,7 @@
 
 #include "Tudat/JsonInterface/Environment/body.h"
 
+#include "Tudat/JsonInterface/Environment/groundStations.h"
 #include "Tudat/JsonInterface/Environment/atmosphere.h"
 #include "Tudat/JsonInterface/Environment/ephemeris.h"
 #include "Tudat/JsonInterface/Environment/gravityField.h"
@@ -27,7 +28,7 @@ namespace simulation_setup
 {
 
 //! Create a `json` object from a shared pointer to a `BodySettings` object.
-void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< BodySettings >& bodySettings )
+void to_json( nlohmann::json& jsonObject, const std::shared_ptr< BodySettings >& bodySettings )
 {
     if ( ! bodySettings )
     {
@@ -37,14 +38,15 @@ void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< BodySettings 
     using K = Keys::Body;
 
     assignIfNotNaN( jsonObject, K::mass, bodySettings->constantMass );
-    assignIfNotNull( jsonObject, K::atmosphere, bodySettings->atmosphereSettings );
-    assignIfNotNull( jsonObject, K::ephemeris, bodySettings->ephemerisSettings );
-    assignIfNotNull( jsonObject, K::gravityField, bodySettings->gravityFieldSettings );
-    assignIfNotNull( jsonObject, K::rotationModel, bodySettings->rotationModelSettings );
-    assignIfNotNull( jsonObject, K::shapeModel, bodySettings->shapeModelSettings );
+    assignIfNotnullptr( jsonObject, K::atmosphere, bodySettings->atmosphereSettings );
+    assignIfNotnullptr( jsonObject, K::ephemeris, bodySettings->ephemerisSettings );
+    assignIfNotnullptr( jsonObject, K::gravityField, bodySettings->gravityFieldSettings );
+    assignIfNotnullptr( jsonObject, K::rotationModel, bodySettings->rotationModelSettings );
+    assignIfNotnullptr( jsonObject, K::shapeModel, bodySettings->shapeModelSettings );
     assignIfNotEmpty( jsonObject, K::radiationPressure, bodySettings->radiationPressureSettings );
-    assignIfNotNull( jsonObject, K::aerodynamics, bodySettings->aerodynamicCoefficientSettings );
+    assignIfNotnullptr( jsonObject, K::aerodynamics, bodySettings->aerodynamicCoefficientSettings );
     assignIfNotEmpty( jsonObject, K::gravityFieldVariation, bodySettings->gravityFieldVariationSettings );
+    assignIfNotEmpty( jsonObject, K::groundStation, bodySettings->groundStationSettings );
 }
 
 } // namespace simulation_setup
@@ -54,16 +56,16 @@ namespace json_interface
 {
 
 //! Create a simulation_setup::BodySettings object with the settings from \p jsonObject.
-boost::shared_ptr< simulation_setup::BodySettings > createBodySettings( const nlohmann::json& jsonObject )
+std::shared_ptr< simulation_setup::BodySettings > createBodySettings( const nlohmann::json& jsonObject )
 {
     using namespace simulation_setup;
-    boost::shared_ptr< BodySettings > bodySettings = boost::make_shared< BodySettings >( );
+    std::shared_ptr< BodySettings > bodySettings = std::make_shared< BodySettings >( );
     updateBodySettings( bodySettings, jsonObject );
     return bodySettings;
 }
 
 //! Update \p bodySettings with the settings from \p jsonObject.
-void updateBodySettings( boost::shared_ptr< simulation_setup::BodySettings >& bodySettings, const nlohmann::json& jsonObject )
+void updateBodySettings( std::shared_ptr< simulation_setup::BodySettings >& bodySettings, const nlohmann::json& jsonObject )
 {
     using namespace simulation_setup;
     using K = Keys::Body;
@@ -77,6 +79,7 @@ void updateBodySettings( boost::shared_ptr< simulation_setup::BodySettings >& bo
     updateFromJSONIfDefined( bodySettings->radiationPressureSettings, jsonObject, K::radiationPressure );
     updateFromJSONIfDefined( bodySettings->aerodynamicCoefficientSettings, jsonObject, K::aerodynamics );
     updateFromJSONIfDefined( bodySettings->gravityFieldVariationSettings, jsonObject, K::gravityFieldVariation );
+    updateFromJSONIfDefined( bodySettings->groundStationSettings, jsonObject, K::groundStation );
 }
 
 } // namespace json_interface

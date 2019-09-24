@@ -34,14 +34,14 @@ Eigen::VectorXd getVectorRepresentationForRotationMatrix(
 
 //! Get the vector representation of a rotation matrix.
 Eigen::VectorXd getVectorRepresentationForRotationMatrixFunction(
-        const boost::function< Eigen::Matrix3d( ) > rotationFunction )
+        const std::function< Eigen::Matrix3d( ) > rotationFunction )
 {
     return getVectorRepresentationForRotationMatrix( rotationFunction( ) );
 }
 
 //! Get the vector representation of a quaternion.
 Eigen::VectorXd getVectorRepresentationForRotationQuaternion(
-        const boost::function< Eigen::Quaterniond( ) > rotationFunction )
+        const std::function< Eigen::Quaterniond( ) > rotationFunction )
 {
     return getVectorRepresentationForRotationMatrix( rotationFunction( ).toRotationMatrix( ) );
 }
@@ -74,10 +74,52 @@ Eigen::Quaterniond getQuaternionFromVectorRotationRepresentation(
     return Eigen::Quaterniond( getMatrixFromVectorRotationRepresentation( vectorRepresentation ) );
 }
 
+//! Function to convert a matrix to the format used to save dependent variables
+void getMatrixInOutputVectorRepresentation(
+        const Eigen::MatrixXd& matrix, Eigen::VectorXd& vector )
+{
+    vector.setZero( matrix.rows( ) * matrix.cols( ) );
+    for( int i = 0; i < matrix.rows( ); i++ )
+    {
+        vector.segment( i * matrix.cols( ), matrix.cols( ) ) =
+              matrix.block( i, 0, 1, matrix.cols( ) ).transpose( );
+    }
+}
+
+//! Function to convert a vector dependent variable output to its original matrix representation
+void getOutputVectorInMatrixRepresentation(
+        const Eigen::VectorXd& vector, Eigen::MatrixXd& matrix,
+        const int rows, const int columns )
+{
+    if( rows * columns != vector.rows( ) )
+    {
+        throw std::runtime_error( "Error when getting matrix from output vector: sizes are incompatible" );
+    }
+    matrix.setZero( rows, columns );
+    for( int i = 0; i < rows; i++ )
+    {
+        matrix.block( i, 0, 1, columns ) = vector.segment( i * columns, columns ).transpose( );
+    }
+}
+
+//! Function to retrieve matrix block function output in vector representation
+Eigen::VectorXd getVectorFunctionFromBlockFunction(
+        const std::function< void( Eigen::Block< Eigen::MatrixXd > ) > blockFunction,
+                                    const int numberOfRows, const int numberOfColumns )
+{
+    Eigen::MatrixXd matrixEvaluation = Eigen::MatrixXd::Zero( numberOfRows, numberOfColumns );
+    blockFunction( matrixEvaluation.block( 0, 0, numberOfRows, numberOfColumns ) );
+
+    Eigen::VectorXd vectorEvaluation;
+    getMatrixInOutputVectorRepresentation( matrixEvaluation, vectorEvaluation );
+
+    return vectorEvaluation;
+}
+
 //! Function to compute the Fay-Riddell equilibrium heat flux from body properties
 double computeEquilibriumFayRiddellHeatFluxFromProperties(
-        const boost::shared_ptr< aerodynamics::FlightConditions > flightConditions,
-        const boost::shared_ptr< system_models::VehicleSystems > vehicleSystems )
+        const std::shared_ptr< aerodynamics::AtmosphericFlightConditions > flightConditions,
+        const std::shared_ptr< system_models::VehicleSystems > vehicleSystems )
 {
     return aerodynamics::computeEquilibriumFayRiddellHeatFlux(
                 flightConditions->getCurrentDensity( ), flightConditions->getCurrentAirspeed( ),
@@ -87,7 +129,7 @@ double computeEquilibriumFayRiddellHeatFluxFromProperties(
 
 
 //! Function to return a vector containing only one value given by doubleFunction
-Eigen::VectorXd getVectorFromDoubleFunction( const boost::function< double( ) >& doubleFunction )
+Eigen::VectorXd getVectorFromDoubleFunction( const std::function< double( ) >& doubleFunction )
 {
     Eigen::VectorXd vector( 1 );
     vector << doubleFunction( );
@@ -96,13 +138,13 @@ Eigen::VectorXd getVectorFromDoubleFunction( const boost::function< double( ) >&
 
 //! Function to evaluate a set of vector-returning functions and concatenate the results.
 Eigen::VectorXd evaluateListOfVectorFunctions(
-        const std::vector< std::pair< boost::function< Eigen::VectorXd( ) >, int > > vectorFunctionList,
+        const std::vector< std::pair< std::function< Eigen::VectorXd( ) >, int > > vectorFunctionList,
         const int totalSize )
 {
     Eigen::VectorXd variableList = Eigen::VectorXd::Zero( totalSize );
     int currentIndex = 0;
 
-    for( std::pair< boost::function< Eigen::VectorXd( ) >, int > vectorFunction: vectorFunctionList )
+    for( std::pair< std::function< Eigen::VectorXd( ) >, int > vectorFunction: vectorFunctionList )
     {
         variableList.segment( currentIndex, vectorFunction.second ) = vectorFunction.first( );
         currentIndex += vectorFunction.second;
@@ -122,7 +164,7 @@ Eigen::VectorXd evaluateListOfVectorFunctions(
 
 //! Funtion to get the size of a dependent variable save settings
 int getDependentVariableSaveSize(
-        const boost::shared_ptr< SingleDependentVariableSaveSettings >& singleDependentVariableSaveSettings )
+        const std::shared_ptr< SingleDependentVariableSaveSettings >& singleDependentVariableSaveSettings )
 {
     if ( singleDependentVariableSaveSettings->componentIndex_ >= 0 )
     {
@@ -130,16 +172,16 @@ int getDependentVariableSaveSize(
     }
     else
     {
-        return getDependentVariableSize( singleDependentVariableSaveSettings->dependentVariableType_ );
+        return getDependentVariableSize(  singleDependentVariableSaveSettings );
     }
 }
 
 //! Funtion to get the size of a dependent variable
 int getDependentVariableSize(
-        const PropagationDependentVariables dependentVariableSettings )
+        const std::shared_ptr< SingleDependentVariableSaveSettings > dependentVariableSettings )
 {
     int variableSize = -1;
-    switch( dependentVariableSettings )
+    switch( dependentVariableSettings->dependentVariableType_ )
     {
     case mach_number_dependent_variable:
         variableSize = 1;
@@ -210,6 +252,12 @@ int getDependentVariableSize(
     case local_temperature_dependent_variable:
         variableSize = 1;
         break;
+    case local_dynamic_pressure_dependent_variable:
+        variableSize = 1;
+        break;
+    case local_aerodynamic_heat_rate_dependent_variable:
+        variableSize = 1;
+        break;
     case geodetic_latitude_dependent_variable:
         variableSize = 1;
         break;
@@ -240,17 +288,88 @@ int getDependentVariableSize(
     case keplerian_state_dependent_variable:
         variableSize = 6;
         break;
+    case spherical_harmonic_acceleration_terms_dependent_variable:
+    {
+        if( std::dynamic_pointer_cast< SphericalHarmonicAccelerationTermsDependentVariableSaveSettings >(
+                    dependentVariableSettings ) == nullptr )
+        {
+             std::string errorMessage = "Error, input for spherical_harmonic_acceleration_terms_dependent_variable inconsistent when getting parameter size ";
+             throw std::runtime_error( errorMessage );
+        }
+        else
+        {
+            variableSize = 3 * std::dynamic_pointer_cast< SphericalHarmonicAccelerationTermsDependentVariableSaveSettings >(
+                        dependentVariableSettings )->componentIndices_.size( );
+        }
+        break;
+    }
     case modified_equinocial_state_dependent_variable:
         variableSize = 6;
         break;
+    case body_fixed_relative_cartesian_position:
+        variableSize = 3;
+        break;
+    case body_fixed_relative_spherical_position:
+        variableSize = 3;
+        break;
+    case euler_angles_to_body_fixed_313:
+        variableSize = 3;
+        break;
+    case total_gravity_field_variation_acceleration:
+        variableSize = 3;
+        break;
+    case single_gravity_field_variation_acceleration:
+        variableSize = 3;
+        break;
+    case single_gravity_field_variation_acceleration_terms:
+    {
+        if( std::dynamic_pointer_cast< SingleVariationSingleTermSphericalHarmonicAccelerationSaveSettings >(
+                    dependentVariableSettings ) == nullptr )
+        {
+             std::string errorMessage = "Error, input for single_gravity_field_variation_acceleration_terms inconsistent when getting parameter size ";
+             throw std::runtime_error( errorMessage );
+        }
+        else
+        {
+            variableSize = 3 * std::dynamic_pointer_cast< SingleVariationSingleTermSphericalHarmonicAccelerationSaveSettings >(
+                        dependentVariableSettings )->componentIndices_.size( );
+        }
+        break;
+    }
+    case acceleration_partial_wrt_body_translational_state:
+        variableSize = 18;
+        break;
+    case current_body_mass_dependent_variable:
+        variableSize = 1;
+        break;
+    case radiation_pressure_coefficient_dependent_variable:
+        variableSize = 1;
+        break;
     default:
         std::string errorMessage = "Error, did not recognize dependent variable size of type: " +
-                std::to_string( dependentVariableSettings );
+                std::to_string( dependentVariableSettings->dependentVariableType_ );
         throw std::runtime_error( errorMessage );
     }
     return variableSize;
 }
 
+template std::pair< std::function< Eigen::VectorXd( ) >, std::map< int, std::string > > createDependentVariableListFunction< double, double >(
+        const std::shared_ptr< DependentVariableSaveSettings > saveSettings,
+        const simulation_setup::NamedBodyMap& bodyMap,
+        const std::unordered_map< IntegratedStateType,
+        std::vector< std::shared_ptr< SingleStateTypeDerivative< double, double > > > >& stateDerivativeModels );
+
+//template std::pair< std::function< Eigen::VectorXd( ) >, int > getVectorDependentVariableFunction< double, double >(
+//        const std::shared_ptr< SingleDependentVariableSaveSettings > dependentVariableSettings,
+//        const simulation_setup::NamedBodyMap& bodyMap,
+//        const std::unordered_map< IntegratedStateType,
+//        std::vector< std::shared_ptr< SingleStateTypeDerivative< double, double > > > >& stateDerivativeModels );
+
+//template std::function< double( ) > getDoubleDependentVariableFunction< double, double >(
+//        const std::shared_ptr< SingleDependentVariableSaveSettings > dependentVariableSettings,
+//        const simulation_setup::NamedBodyMap& bodyMap,
+//        const std::unordered_map< IntegratedStateType,
+//        std::vector< std::shared_ptr< SingleStateTypeDerivative< double, double > > > >& stateDerivativeModels );
 
 } // namespace propagators
 

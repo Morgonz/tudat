@@ -12,7 +12,7 @@
 #ifndef TUDAT_RUNGE_KUTTA_4_INTEGRATOR_H
 #define TUDAT_RUNGE_KUTTA_4_INTEGRATOR_H
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
@@ -20,6 +20,7 @@
 
 namespace tudat
 {
+
 namespace numerical_integrators
 {
 
@@ -33,7 +34,7 @@ namespace numerical_integrators
  * \tparam IndependentVariableType The type of the independent variable.
  * \sa NumericalIntegrator.
  */
-template < typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
+template< typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
            typename StateDerivativeType = Eigen::VectorXd, typename TimeStepType = IndependentVariableType >
 class RungeKutta4Integrator
         : public numerical_integrators::ReinitializableNumericalIntegrator<
@@ -114,7 +115,8 @@ public:
         {
             IndependentVariableType time;
             StateType state;
-            switch ( i ) {
+            switch ( i )
+            {
             case 1:
                 time = currentIndependentVariable_;
                 state = currentState_;
@@ -195,15 +197,41 @@ public:
         return lastState_;
     }
 
-    //! Modify the state at the current value of the independent variable.
+    //! Replace the state with a new value.
     /*!
-     * Modify the state at the current value of the independent variable.
-     * \param newState The new state to set the current state to.
+     * Replace the state with a new value. This allows for discrete jumps in the state, often
+     * used in simulations of discrete events. In astrodynamics, this relates to simulations of rocket staging,
+     * impulsive shots, parachuting, ideal control, etc. The modified state, by default, cannot be rolled back; to do this, either
+     * set the flag to true, or store the state before calling this function the first time, and call it again with the initial state
+     * as parameter to revert to the state before the discrete change.
+     * \param newState The value of the new state.
+     * \param allowRollback Boolean denoting whether roll-back should be allowed.
      */
-    void modifyCurrentState( const StateType& newState )
+    void modifyCurrentState( const StateType& newState, const bool allowRollback = false )
     {
-        this->currentState_ = newState;
-        this->lastIndependentVariable_ = currentIndependentVariable_;
+        currentState_ = newState;
+        if ( !allowRollback )
+        {
+            this->lastIndependentVariable_ = currentIndependentVariable_;
+        }
+    }
+
+    //! Modify the state and time for the current step.
+    /*!
+     * Modify the state and time for the current step.
+     * \param newState The new state to set the current state to.
+     * \param newTime The time to set the current time to.
+     * \param allowRollback Boolean denoting whether roll-back should be allowed.
+     */
+    void modifyCurrentIntegrationVariables( const StateType& newState, const IndependentVariableType newTime,
+                                            const bool allowRollback = false )
+    {
+        currentState_ = newState;
+        currentIndependentVariable_ = newTime;
+        if ( !allowRollback )
+        {
+            this->lastIndependentVariable_ = currentIndependentVariable_;
+        }
     }
 
 protected:
@@ -237,7 +265,13 @@ protected:
      * Last state as computed by performIntegrationStep().
      */
     StateType lastState_;
+
 };
+
+extern template class RungeKutta4Integrator < double, Eigen::VectorXd, Eigen::VectorXd >;
+extern template class RungeKutta4Integrator < double, Eigen::Vector6d, Eigen::Vector6d >;
+extern template class RungeKutta4Integrator < double, Eigen::MatrixXd, Eigen::MatrixXd >;
+
 
 //! Typedef of RK4 integrator (state/state derivative = VectorXd, independent variable = double).
 /*!
@@ -258,16 +292,17 @@ typedef RungeKutta4Integrator< double, double, double > RungeKutta4Integratord;
  * Typedef of pointer to a RK4 integrator with VectorXds as state and state derivative and double
  * as independent variable.
  */
-typedef boost::shared_ptr< RungeKutta4IntegratorXd > RungeKutta4IntegratorXdPointer;
+typedef std::shared_ptr< RungeKutta4IntegratorXd > RungeKutta4IntegratorXdPointer;
 
 //! Typedef of pointer to a scalar RK4 integrator.
 /*!
  * Typedef of pointer to an RK4 integrator with doubles as state and state derivative and
  * independent variable.
  */
-typedef boost::shared_ptr< RungeKutta4Integratord > RungeKutta4IntegratordPointer;
+typedef std::shared_ptr< RungeKutta4Integratord > RungeKutta4IntegratordPointer;
 
 } // namespace numerical_integrators
+
 } // namespace tudat
 
 #endif // TUDAT_RUNGE_KUTTA_4_INTEGRATOR_H

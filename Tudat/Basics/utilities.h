@@ -11,14 +11,13 @@
 #ifndef TUDAT_UTILITIES_H
 #define TUDAT_UTILITIES_H
 
-#include <vector>
-
-#include <iostream>
 #include <map>
+#include <vector>
+#include <iostream>
 
-#include <boost/function.hpp>
+#include <functional>
 #include <boost/multi_array.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
@@ -57,7 +56,6 @@ std::map< S, T > linearlyScaleKeyOfMap(
         else
         {
             newKey = mapIterator->first * scale - offset;
-
         }
 
         // Set scalted map key with corresponding value in new map
@@ -83,14 +81,12 @@ std::vector< VectorArgument > createVectorFromMapValues( const std::map< KeyType
     // Iterate over all map entries and create vector
     int currentIndex = 0;
     for( typename std::map< KeyType, VectorArgument >::const_iterator mapIterator = inputMap.begin( );
-         mapIterator != inputMap.end( ); mapIterator++ )
+         mapIterator != inputMap.end( ); mapIterator++, currentIndex++ )
     {
         outputVector[ currentIndex ] = mapIterator->second;
-        currentIndex++;
     }
 
     return outputVector;
-
 }
 
 //! Function to create a vector from the keys of a map
@@ -110,10 +106,9 @@ std::vector< KeyType > createVectorFromMapKeys( const std::map< KeyType, VectorA
     // Iterate over all map entries and create vector
     int currentIndex = 0;
     for( typename std::map< KeyType, VectorArgument >::const_iterator mapIterator = inputMap.begin( );
-         mapIterator != inputMap.end( ); mapIterator++ )
+         mapIterator != inputMap.end( ); mapIterator++, currentIndex++ )
     {
         outputVector[ currentIndex ] = mapIterator->first;
-        currentIndex++;
     }
 
     return outputVector;
@@ -127,7 +122,7 @@ std::vector< KeyType > createVectorFromMapKeys( const std::map< KeyType, VectorA
  * \return Sum of return values of function1 and function2
  */
 template< typename S >
-S sumFunctionReturn( const boost::function< S( ) > function1, const boost::function< S( ) > function2 )
+S sumFunctionReturn( const std::function< S( ) > function1, const std::function< S( ) > function2 )
 {
     return function1( ) + function2( );
 }
@@ -140,7 +135,7 @@ S sumFunctionReturn( const boost::function< S( ) > function1, const boost::funct
  * \return Return values of function1 - return value of function2
  */
 template< typename S >
-S subtractFunctionReturn( const boost::function< S( ) > function1, const boost::function< S( ) > function2 )
+S subtractFunctionReturn( const std::function< S( ) > function1, const std::function< S( ) > function2 )
 {
     return function1( ) - function2( );
 }
@@ -177,7 +172,7 @@ void createVectorBlockMatrixHistory(
  *  \param mapToPrint Map that is to be printed.
  */
 template< typename S, typename T >
-void printMapContents( const std::map< S, T >& mapToPrint)
+void printMapContents( const std::map< S, T >& mapToPrint )
 {
     for( typename std::map< S, T >::const_iterator mapIterator = mapToPrint.begin( );
          mapIterator != mapToPrint.end( ); mapIterator++ )
@@ -212,20 +207,20 @@ void castMatrixMap( const std::map< S, Eigen::Matrix< T, Rows, Columns > >& orig
  *  \return Dynamic casted vector of T shared pointers.
  */
 template< typename S, typename T >
-std::vector< boost::shared_ptr< T > >dynamicCastSVectorToTVector( const std::vector< boost::shared_ptr< S > >& originalVector )
+std::vector< std::shared_ptr< T > >dynamicCastSVectorToTVector( const std::vector< std::shared_ptr< S > >& originalVector )
 {
-    std::vector< boost::shared_ptr< T > > castVector;
+    std::vector< std::shared_ptr< T > > castVector;
 
     // Iterate over all entries and perform dynamic cast for each entry.
     for( unsigned int i = 0; i < originalVector.size( ); i++ )
     {
-        castVector.push_back( boost::dynamic_pointer_cast< T >( originalVector.at( i ) ) );
+        castVector.push_back( std::dynamic_pointer_cast< T >( originalVector.at( i ) ) );
     }
 
     return castVector;
 }
 
-
+//! Function to concatenate matrix values of map.
 template< typename KeyType, typename ScalarType, int NumberOfRows, int NumberOfColumns = 1 >
 Eigen::Matrix< ScalarType, Eigen::Dynamic, NumberOfColumns > createConcatenatedEigenMatrixFromMapValues(
         const std::map< KeyType, Eigen::Matrix< ScalarType, NumberOfRows, NumberOfColumns > >& inputMap )
@@ -281,6 +276,38 @@ Eigen::Matrix< ScalarType, Eigen::Dynamic, NumberOfColumns > createConcatenatedE
     return outputVector;
 }
 
+//! Function to extract both keys and values from map, and output them as a pair.
+template< typename KeyType, typename ScalarType, int NumberOfRows >
+std::pair< Eigen::Matrix< ScalarType, Eigen::Dynamic, 1 >, Eigen::Matrix< ScalarType, Eigen::Dynamic, Eigen::Dynamic > >
+extractKeyAndValuesFromMap( const std::map< KeyType, Eigen::Matrix< ScalarType, NumberOfRows, 1 > >& inputMap )
+{
+    // Declare eventual output variables
+    Eigen::Matrix< ScalarType, Eigen::Dynamic, 1 > keyValuesVector;
+    Eigen::Matrix< ScalarType, Eigen::Dynamic, Eigen::Dynamic > mappedValuesMatrix;
+
+    // Make compatible with Eigen::Dynamic vectors
+    bool dynamicInput = ( NumberOfRows == Eigen::Dynamic );
+    unsigned int resizingDimension = dynamicInput ? inputMap.begin( )->second.rows( ) : NumberOfRows;
+
+    // Assign size to matrices
+    unsigned int numberOfKeys = inputMap.size( );
+    keyValuesVector.resize( numberOfKeys, 1 );
+    mappedValuesMatrix.resize( resizingDimension, numberOfKeys );
+
+    // Loop over map and save elements
+    int i = 0;
+    for ( typename std::map< KeyType, Eigen::Matrix< ScalarType, NumberOfRows, 1 > >::const_iterator
+          mapIterator = inputMap.begin( ); mapIterator != inputMap.end( ); mapIterator++, i++ )
+    {
+        keyValuesVector[ i ] = mapIterator->first;
+        mappedValuesMatrix.col( i ) = mapIterator->second;
+    }
+
+    // Give output
+    return std::make_pair( keyValuesVector, mappedValuesMatrix );
+}
+
+//! Function to convert Eigen::Vector to std::vector.
 template< typename T >
 std::vector< T > convertEigenVectorToStlVector( const Eigen::Matrix< T, Eigen::Dynamic, 1 >& eigenVector )
 {
@@ -293,7 +320,7 @@ std::vector< T > convertEigenVectorToStlVector( const Eigen::Matrix< T, Eigen::D
     return stlVector;
 }
 
-
+//! Function to convert std::vector to Eigen::Vector.
 template< typename T >
 Eigen::Matrix< T, Eigen::Dynamic, 1 > convertStlVectorToEigenVector( const std::vector< T >& stlVector )
 {
@@ -305,18 +332,40 @@ Eigen::Matrix< T, Eigen::Dynamic, 1 > convertStlVectorToEigenVector( const std::
     return eigenVector;
 }
 
+//! Function to convert std::vector to Eigen::Matrix.
+template< typename T, int Rows = Eigen::Dynamic >
+Eigen::Matrix< T, Eigen::Dynamic, Eigen::Dynamic > convertStlVectorToEigenMatrix(
+        const std::vector< Eigen::Matrix< T, Rows, 1 > >& stlVector )
+{
+    // Create empty vector
+    int numberOfRows = Rows;
+    if ( numberOfRows == Eigen::Dynamic )
+    {
+        numberOfRows = stlVector.front( ).rows( );
+    }
+    Eigen::Matrix< T, Eigen::Dynamic, Eigen::Dynamic > eigenMatrix =
+            Eigen::Matrix< T, Eigen::Dynamic, Eigen::Dynamic >::Zero( numberOfRows, stlVector.size( ) );
+
+    // Assign values
+    for( unsigned int i = 0; i < stlVector.size( ); i++ )
+    {
+        eigenMatrix.col( i ) = stlVector.at( i );
+    }
+    return eigenMatrix;
+}
+
 //! Function to add a double to all entries in an STL vector.
 /*!
- *  Function to add a double to all entries in an STL vector (addition of a double must be defined for Argument type).
+ *  Function to add a double to all entries in an STL vector (addition of a double must be defined for T type).
  *  \param vector Vector to which a double is to be added.
  *  \param scalar Value that is to be added to vector
  *  \return New vector with scalar added to all entries of input vector.
  */
-template< typename Argument >
-std::vector< Argument > addScalarToVector( const std::vector< Argument >& vector, const double scalar )
+template< typename T >
+std::vector< T > addScalarToVector( const std::vector< T >& vector, const double scalar )
 {
     // Declare and resize return vector.
-    std::vector< Argument > addedVector;
+    std::vector< T > addedVector;
     addedVector.resize( vector.size( ) );
 
     // Add scalar to all entries of input vector
@@ -327,8 +376,6 @@ std::vector< Argument > addScalarToVector( const std::vector< Argument >& vector
 
     return addedVector;
 }
-
-
 
 //! Function to copy a multi-array into another multi-array
 /*!
@@ -356,13 +403,13 @@ void copyMultiArray( const boost::multi_array< S, NumberOfDimensions >& arrayToC
  *  \return Index in nth direction of pointer to single entry in multi-array of doubles
  */
 template< unsigned int NumberOfDimensions >
-typename boost::multi_array< double ,NumberOfDimensions >::index getMultiArrayIndex(
+typename boost::multi_array< double, NumberOfDimensions >::index getMultiArrayIndex(
         const typename boost::multi_array< double, NumberOfDimensions >& multiArray, const double* requestedElement,
         const unsigned short int direction )
 {
     int offset = requestedElement - multiArray.origin( );
-    return( offset / multiArray.strides( )[ direction] % multiArray.shape( )[ direction ] +
-            multiArray.index_bases( )[direction] );
+    return( offset / multiArray.strides( )[ direction ] % multiArray.shape( )[ direction ] +
+            multiArray.index_bases( )[ direction ] );
 }
 
 //! Get indices of pointer to single entry in multi-array (size 1) of doubles
@@ -395,7 +442,6 @@ boost::array< boost::multi_array< double, 2 >::index, 2 > getMultiArrayIndexArra
 boost::array< boost::multi_array< double, 3 >::index, 3 > getMultiArrayIndexArray(
         const boost::multi_array< double, 3 >& multiArray, const double* requestedElement );
 
-
 template< typename S, typename T >
 std::vector< S > createVectorFromVectorOfPairFirsts( const std::vector< std::pair< S, T > > inputVector )
 {
@@ -409,7 +455,7 @@ std::vector< S > createVectorFromVectorOfPairFirsts( const std::vector< std::pai
 }
 
 template< typename T, typename S >
-T evaluateFunctionWithoutInputArgumentDependency( boost::function< T( ) > inputFreeFunction, const S dummyInput )
+T evaluateFunctionWithoutInputArgumentDependency( std::function< T( ) > inputFreeFunction, const S dummyInput )
 {
     return inputFreeFunction( );
 }
@@ -451,7 +497,6 @@ std::vector< VectorArgument > createVectorFromMultiMapValues( const std::multima
     }
 
     return outputVector;
-
 }
 
 //! Function to create a vector from the keys of a multimap
@@ -525,7 +570,7 @@ bool doStlVectorContentsMatch(
 
 //! Transform from map of std::vector (output of text file reader) to map of Eigen::Array
 template< typename MapKey, typename ScalarType >
-std::map< MapKey, Eigen::Array< ScalarType, Eigen::Dynamic, 1 > > convertSTLVectorMapToEigenVectorMap(
+std::map< MapKey, Eigen::Array< ScalarType, Eigen::Dynamic, 1 > > convertStlVectorMapToEigenVectorMap(
         std::map< MapKey, std::vector< ScalarType > > stlVectorMap )
 {
     std::map< MapKey, Eigen::Array< ScalarType, Eigen::Dynamic, 1 > > eigenMap;
@@ -539,6 +584,52 @@ std::map< MapKey, Eigen::Array< ScalarType, Eigen::Dynamic, 1 > > convertSTLVect
         eigenMap[ ent.first ] = array;
     }
     return eigenMap;
+}
+
+//! Function to slice standard library vector, given an optional initial and final slicing values.
+template< typename T >
+std::vector< T > sliceStlVector( const std::vector< T >& vectorToBeSliced, unsigned int startIndex = 0,
+                                 unsigned int endIndex = std::numeric_limits< unsigned int >::signaling_NaN( ) )
+{
+    // Declare output vector
+    std::vector< T > slicedVector;
+
+    // Give value to end index
+    if ( endIndex == std::numeric_limits< unsigned int >::signaling_NaN( ) )
+    {
+        endIndex = vectorToBeSliced.size( ) - 1;
+    }
+
+    // Check that boundaries make sense
+    if ( startIndex > endIndex )
+    {
+        // Warn user of inconsistency
+        std::cerr << "Warning in slicing of std::vector. The starting index is greater than the end index. "
+                     "The indices will be swapped." << std::endl;
+
+        // Swap indices
+        unsigned int temporaryIndex = startIndex;
+        startIndex = endIndex;
+        endIndex = temporaryIndex;
+    }
+
+    // Transfer values to sliced array
+    for ( unsigned int i = startIndex; i < ( endIndex + 1 ); i++ )
+    {
+        slicedVector.push_back( vectorToBeSliced.at( i ) );
+    }
+    return slicedVector;
+}
+
+template< typename KeyType, typename ScalarType, int FixedSize >
+void castDynamicToFixedSizeEigenVectorMap(
+        std::map< KeyType, Eigen::Matrix< ScalarType, Eigen::Dynamic, 1 > >& originalMap,
+        std::map< KeyType, Eigen::Matrix< ScalarType, FixedSize, 1 > >& fixedSizeMap )
+{
+    for( auto mapIterator : originalMap )
+    {
+        fixedSizeMap[ mapIterator.first ] = mapIterator.second;
+    }
 }
 
 } // namespace utilities

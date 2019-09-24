@@ -27,6 +27,9 @@ std::string getParameterTypeString( const EstimatebleParametersEnum parameterTyp
     case initial_body_state:
         parameterDescription = "translational state ";
         break;
+    case initial_rotational_body_state:
+        parameterDescription = "rotational state ";
+        break;
     case gravitational_parameter:
         parameterDescription = "gravitational parameter ";
         break;
@@ -38,6 +41,9 @@ std::string getParameterTypeString( const EstimatebleParametersEnum parameterTyp
         break;
     case arc_wise_radiation_pressure_coefficient:
         parameterDescription = "arc-wise radiation pressure coefficient ";
+        break;
+    case arc_wise_constant_drag_coefficient:
+        parameterDescription = "arc-wise drag coefficient ";
         break;
     case spherical_harmonics_cosine_coefficient_block:
         parameterDescription = "cosine spherical harmonic coefficient block ";
@@ -90,6 +96,12 @@ std::string getParameterTypeString( const EstimatebleParametersEnum parameterTyp
     case direct_dissipation_tidal_time_lag:
         parameterDescription = " direct tidal time-lag ";
         break;
+    case mean_moment_of_inertia:
+        parameterDescription = " mean moment of inertia ";
+        break;
+    case desaturation_delta_v_values:
+        parameterDescription = " momentum wheel desaturation Delta V ";
+        break;
     default:
         std::string errorMessage = "Error when getting parameter string, did not recognize parameter " +
                 std::to_string( parameterType );
@@ -108,6 +120,9 @@ bool isParameterDynamicalPropertyInitialState( const EstimatebleParametersEnum p
         flag = true;
         break;
     case initial_body_state:
+        flag = true;
+        break;
+    case initial_rotational_body_state:
         flag = true;
         break;
     default:
@@ -133,6 +148,9 @@ bool isDoubleParameter( const EstimatebleParametersEnum parameterType )
         isDoubleParameter = true;
         break;
     case arc_wise_radiation_pressure_coefficient:
+        isDoubleParameter = false;
+        break;
+    case arc_wise_constant_drag_coefficient:
         isDoubleParameter = false;
         break;
     case spherical_harmonics_cosine_coefficient_block:
@@ -186,6 +204,12 @@ bool isDoubleParameter( const EstimatebleParametersEnum parameterType )
     case direct_dissipation_tidal_time_lag:
          isDoubleParameter = true;
         break;
+    case mean_moment_of_inertia:
+         isDoubleParameter = true;
+        break;
+    case desaturation_delta_v_values:
+        isDoubleParameter = false;
+       break;
     default:
         throw std::runtime_error( "Error, parameter type " + std::to_string( parameterType ) +
                                   " not found when getting parameter type" );
@@ -203,6 +227,9 @@ bool isParameterRotationMatrixProperty( const EstimatebleParametersEnum paramete
         flag = true;
         break;
     case rotation_pole_position:
+        flag = true;
+        break;
+    case initial_rotational_body_state:
         flag = true;
         break;
     default:
@@ -256,8 +283,16 @@ bool isParameterTidalProperty( const EstimatebleParametersEnum parameterType )
     return flag;
 }
 
+//#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+//template class EstimatableParameter< Eigen::VectorXd >;
+//template class EstimatableParameter< Eigen::Matrix< long double, Eigen::Dynamic, 1 > >;
+//#endif
 
+//template class EstimatableParameterSet< double >;
 
+//#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+//template class EstimatableParameterSet< long double >;
+//#endif
 
 }
 

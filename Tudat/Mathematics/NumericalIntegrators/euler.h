@@ -7,12 +7,14 @@
  *    a copy of the license with this file. If not, please or visit:
  *    http://tudat.tudelft.nl/LICENSE.
  *
+ *    References
+ *
  */
 
 #ifndef TUDAT_EULER_INTEGRATOR_H
 #define TUDAT_EULER_INTEGRATOR_H
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
@@ -33,7 +35,7 @@ namespace numerical_integrators
  * \tparam IndependentVariableType The type of the independent variable.
  * \sa NumericalIntegrator.
  */
-template < typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
+template< typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
            typename StateDerivativeType = Eigen::VectorXd, typename TimeStepType = IndependentVariableType >
 class EulerIntegrator :
         public numerical_integrators::ReinitializableNumericalIntegrator<
@@ -162,15 +164,41 @@ public:
         return this->lastState_;
     }
 
-    //! Modify the state at the current value of the independent variable.
+    //! Replace the state with a new value.
     /*!
-     * Modify the state at the current value of the independent variable.
-     * \param newState The new state to set the current state to.
+     * Replace the state with a new value. This allows for discrete jumps in the state, often
+     * used in simulations of discrete events. In astrodynamics, this relates to simulations of rocket staging,
+     * impulsive shots, parachuting, ideal control, etc. The modified state, by default, cannot be rolled back; to do this, either
+     * set the flag to true, or store the state before calling this function the first time, and call it again with the initial state
+     * as parameter to revert to the state before the discrete change.
+     * \param newState The value of the new state.
+     * \param allowRollback Boolean denoting whether roll-back should be allowed.
      */
-    void modifyCurrentState( const StateType& newState )
+    void modifyCurrentState( const StateType& newState, const bool allowRollback = false )
     {
-        this->currentState_ = newState;
-        this->lastIndependentVariable_ = currentIndependentVariable_;
+        currentState_ = newState;
+        if ( !allowRollback )
+        {
+            this->lastIndependentVariable_ = currentIndependentVariable_;
+        }
+    }
+
+    //! Modify the state and time for the current step.
+    /*!
+     * Modify the state and time for the current step.
+     * \param newState The new state to set the current state to.
+     * \param newTime The time to set the current time to.
+     * \param allowRollback Boolean denoting whether roll-back should be allowed.
+     */
+    void modifyCurrentIntegrationVariables( const StateType& newState, const IndependentVariableType newTime,
+                                            const bool allowRollback = false )
+    {
+        currentState_ = newState;
+        currentIndependentVariable_ = newTime;
+        if ( !allowRollback )
+        {
+            this->lastIndependentVariable_ = currentIndependentVariable_;
+        }
     }
 
 protected:
@@ -195,7 +223,7 @@ protected:
 
     //! Last independent variable.
     /*!
-     * Last independent variable value as computed by performIntegrationStep().
+     * Last independent variable value as computed by performIntegrationStep( ).
      */
     IndependentVariableType lastIndependentVariable_;
 
@@ -224,14 +252,14 @@ typedef EulerIntegrator< double, double, double > EulerIntegratord;
  * Typedef for a shared-pointer to an Euler integrator with VectorXds as state and state derivative and double
  * as independent variable.
  */
-typedef boost::shared_ptr< EulerIntegratorXd > EulerIntegratorXdPointer;
+typedef std::shared_ptr< EulerIntegratorXd > EulerIntegratorXdPointer;
 
 //! Typedef of pointer to a scalar Euler integrator.
 /*!
  * Typedef of pointer to an Euler integrator with doubles as state and state derivative and
  * independent variable.
  */
-typedef boost::shared_ptr< EulerIntegratord > EulerIntegratordPointer;
+typedef std::shared_ptr< EulerIntegratord > EulerIntegratordPointer;
 
 } // namespace numerical_integrators
 } // namespace tudat

@@ -21,7 +21,7 @@
 #include "Tudat/Astrodynamics/Aerodynamics/aerodynamics.h"
 #include "Tudat/Astrodynamics/Aerodynamics/equilibriumWallTemperature.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/make_shared.hpp>
 
 namespace tudat
@@ -516,7 +516,7 @@ double computeAerodynamicLoadFromAcceleration( const Eigen::Vector3d& aerodynami
 }
 
 //! Funtion to compute the equilibrium heat flux experienced by a vehicle
-double computeEquilibriumHeatflux( const boost::function< double( const double ) > heatTransferFunction,
+double computeEquilibriumHeatflux( const std::function< double( const double ) > heatTransferFunction,
                                    const double wallEmmisivity,
                                    const double adiabaticWallTemperature )
 {
@@ -531,15 +531,13 @@ double computeEquilibriumFayRiddellHeatFlux( const double airDensity,
                                              const double machNumber,
                                              const double noseRadius,
                                              const double wallEmissivity )
-
 {
-
     // Compute adiabatic wall temperature.
     double adiabaticWallTemperature
             = computeAdiabaticWallTemperature( airTemperature , machNumber );
 
-    boost::function< double( const double ) > heatTransferFunction = boost::bind(
-                &computeFayRiddellHeatFlux, airDensity, airSpeed, airTemperature, noseRadius, _1 );
+    std::function< double( const double ) > heatTransferFunction = std::bind(
+                &computeFayRiddellHeatFlux, airDensity, airSpeed, airTemperature, noseRadius, std::placeholders::_1 );
 
     return computeEquilibriumHeatflux( heatTransferFunction, wallEmissivity, adiabaticWallTemperature );
 }
@@ -551,7 +549,6 @@ double computeFayRiddellHeatFlux( const double airDensity,
                                   const double noseRadius,
                                   const double wallTemperature )
 {
-
     // Compute the current heat flux.
     return FAY_RIDDEL_HEAT_FLUX_CONSTANT * sqrt( airDensity * std::pow( airSpeed , 2.0 ) / noseRadius )
             * ( 0.5 * std::pow( airSpeed , 2.0 ) + 1004.0 * ( airTemperature - wallTemperature ) );
@@ -567,7 +564,6 @@ double computeAdiabaticWallTemperature(
 
     return airTemperature + recoveryFactor * ( totalTemperature - airTemperature );
 }
-
 
 } // namespace aerodynamics
 } // namespace tudat

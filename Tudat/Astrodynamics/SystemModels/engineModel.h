@@ -12,7 +12,7 @@
 #define TUDAT_ENGINEMODEL_H
 
 #include <Eigen/Core>
-#include <boost/function.hpp>
+#include <functional>
 
 #include "Tudat/Astrodynamics/Propulsion/thrustFunctions.h"
 
@@ -20,6 +20,7 @@
 
 namespace tudat
 {
+
 namespace system_models
 {
 
@@ -61,7 +62,7 @@ public:
 
     //! Pure virtual function to update the engine model to the current time
     /*!
-     *  Pure virtual function to update the engine model to the current time. This function must be implemented in teh derived
+     *  Pure virtual function to update the engine model to the current time. This function must be implemented in the derived
      *  class, wehre it typically resets the currentThrust_ variable (and any associated variables).
      *  \param currentTime Current itme in simulation.
      */
@@ -99,9 +100,9 @@ protected:
 
 };
 
-//! Engine model derived class in which the thrust is computed directly from teh propellant mass flow and specific impulse
+//! Engine model derived class in which the thrust is computed directly from the propellant mass flow and specific impulse
 /*!
- *  Engine model derived class in which the thrust is computed directly from teh propellant mass flow and specific impulse
+ *  Engine model derived class in which the thrust is computed directly from the propellant mass flow and specific impulse
  *  These two variables may be either constant or variable (magnitudes controlled by associated class defining e.g. GNC
  *  system.
  */
@@ -121,8 +122,8 @@ public:
      *  to the positive x-direction, along the longitudinal axis.
      */
     DirectEngineModel(
-            const boost::function< double( ) > specificImpulseFunction,
-            const boost::function< double( ) > massFlowFunction,
+            const std::function< double( ) > specificImpulseFunction,
+            const std::function< double( ) > massFlowFunction,
             const Eigen::Vector3d bodyFixedThrustDirection = Eigen::Vector3d::UnitX( ) ):
         EngineModel( bodyFixedThrustDirection ),
         specificImpulseFunction_( specificImpulseFunction ),
@@ -150,14 +151,14 @@ public:
         return massFlowFunction_( );
     }
 
-
 protected:
 
     //! Variable specific impulse of engine (no input arguments provided; must be updated by associated guidance law).
-    boost::function< double( ) > specificImpulseFunction_;
+    std::function< double( ) > specificImpulseFunction_;
 
     //! Variable mass flow function (no input arguments provided; must be updated by associated guidance law).
-    boost::function< double( ) > massFlowFunction_;
+    std::function< double( ) > massFlowFunction_;
+
 };
 
 } // namespace system_models

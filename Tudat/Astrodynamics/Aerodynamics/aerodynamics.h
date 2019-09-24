@@ -19,9 +19,10 @@
 #ifndef TUDAT_AERODYNAMICS_H
 #define TUDAT_AERODYNAMICS_H
 
-#include <boost/function.hpp>
+#include <functional>
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include <vector>
 #include <cmath>
@@ -33,7 +34,6 @@ namespace tudat
 {
 namespace aerodynamics
 {
-
 
 //! Enum defining a list of independent variables on which the aerodynamic coefficients can depend.
 /*!
@@ -52,7 +52,6 @@ enum AerodynamicCoefficientsIndependentVariables
     undefined_independent_variable = 5
 };
 
-
 //! Function to combined the force and moment coefficients from separate function pointers.
 /*!
  *  Function to combined the force and moment coefficients from separate function pointers.
@@ -66,9 +65,9 @@ enum AerodynamicCoefficientsIndependentVariables
  *  which the coefficients depend.
  */
 inline Eigen::Vector6d concatenateForceAndMomentCoefficients(
-        const boost::function< Eigen::Vector3d( const std::vector< double >& ) >&
+        const std::function< Eigen::Vector3d( const std::vector< double >& ) >&
         forceCoefficientFunction,
-        const boost::function< Eigen::Vector3d( const std::vector< double >& ) >&
+        const std::function< Eigen::Vector3d( const std::vector< double >& ) >&
         momentCoefficientFunction,
         const std::vector< double >& independentVariables )
 {
@@ -428,7 +427,7 @@ double computeAerodynamicLoadFromAcceleration( const Eigen::Vector3d& aerodynami
  * \param adiabaticWallTemperature Adiabatic wall temperature (used only for initialization of root finder).
  * \return Convective heat flux experienced acording to Fay Riddell model at equilibrium wall temperature.
  */
-double computeEquilibriumHeatflux( const boost::function< double( const double ) > heatTransferFunction,
+double computeEquilibriumHeatflux( const std::function< double( const double ) > heatTransferFunction,
                                    const double wallEmmisivity,
                                    const double adiabaticWallTemperature );
 

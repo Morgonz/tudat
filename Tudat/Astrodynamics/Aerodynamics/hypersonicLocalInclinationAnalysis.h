@@ -24,7 +24,7 @@
 
 #include <boost/array.hpp>
 #include <boost/multi_array.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
@@ -99,17 +99,19 @@ public:
      *  and moments.
      *  \param referenceLength Reference length used to non-dimensionalize aerodynamic moments.
      *  \param momentReferencePoint Reference point wrt which aerodynamic moments are calculated.
+     *  \param savePressureCoefficients Boolean denoting whether to save the pressure coefficients that are computed to files
      */
     HypersonicLocalInclinationAnalysis(
             const std::vector< std::vector< double > >& dataPointsOfIndependentVariables,
-            const boost::shared_ptr< SurfaceGeometry > inputVehicleSurface,
+            const std::shared_ptr< SurfaceGeometry > inputVehicleSurface,
             const std::vector< int >& numberOfLines,
             const std::vector< int >& numberOfPoints,
             const std::vector< bool >& invertOrders,
             const std::vector< std::vector< int > >& selectedMethods,
             const double referenceArea,
             const double referenceLength,
-            const Eigen::Vector3d& momentReferencePoint );
+            const Eigen::Vector3d& momentReferencePoint,
+            const bool savePressureCoefficients = false );
 
     //! Default destructor.
     /*!
@@ -120,7 +122,7 @@ public:
     //! Get aerodynamic coefficients.
     /*!
      *  Returns aerodynamic coefficients.
-     *  The physical meaning of each of the three independent variables is: 0 = mach numner,
+     *  The physical meaning of each of the three independent variables is: 0 = mach number,
      *  1 = angle of attack, 2 = angle of sideslip.
      * \param independentVariables Array of values of independent variable
      *          indices in dataPointsOfIndependentVariables_.
@@ -155,11 +157,12 @@ public:
      * \param vehicleIndex Index in vehicleParts_ to be retrieved.
      * \return Requested vehicle part.
      */
-     boost::shared_ptr< geometric_shapes::LawgsPartGeometry > getVehiclePart(
+     std::shared_ptr< geometric_shapes::LawgsPartGeometry > getVehiclePart(
              const int vehicleIndex ) const
      {
          return vehicleParts_[ vehicleIndex ];
      }
+
 
     //! Overload ostream to print class information.
     /*!
@@ -170,8 +173,45 @@ public:
      * \return Stream object.
      */
     friend std::ostream& operator << ( std::ostream& stream,
-                                     HypersonicLocalInclinationAnalysis&
-                                     hypersonicLocalInclinationAnalysis );
+                                       HypersonicLocalInclinationAnalysis&
+                                       hypersonicLocalInclinationAnalysis );
+
+    //! Function to retrieve a list of mesh panel centroids for the full vehicle geometry
+    /*!
+     * Function to retrieve a list of mesh panel centroids for the full vehicle geometry
+     * \return List of mesh panel centroids for the full vehicle geometry
+     */
+    std::vector< boost::multi_array< Eigen::Vector3d, 2 > > getMeshPoints( )
+    {
+        std::vector< boost::multi_array< Eigen::Vector3d, 2 > > meshPointsList;
+        for( unsigned int i = 0; i < vehicleParts_.size( ); i++ )
+        {
+            meshPointsList.push_back( vehicleParts_.at( i )->getMeshPoints( ) );
+        }
+        return meshPointsList;
+    }
+
+    //! Function to retrieve a list of mesh panel surface normals for the full vehicle geometry
+    /*!
+     * Function to retrieve a list of mesh panel surface normals for the full vehicle geometry
+     * \return List of mesh panel surface normals for the full vehicle geometry
+     */
+    std::vector< boost::multi_array< Eigen::Vector3d, 2 > > getPanelSurfaceNormals( )
+    {
+        std::vector< boost::multi_array< Eigen::Vector3d, 2 > > paneSurfaceNormalList;
+        for( unsigned int i = 0; i < vehicleParts_.size( ); i++ )
+        {
+            paneSurfaceNormalList.push_back( vehicleParts_.at( i )->getPanelSurfaceNormals( ) );
+        }
+        return paneSurfaceNormalList;
+    }
+
+    std::vector< std::vector< std::vector< double > > > getPressureCoefficientList(
+            const boost::array< int, 3 > independentVariables )
+    {
+        return pressureCoefficientList_.at( independentVariables );
+    }
+
 
 private:
 
@@ -179,7 +219,7 @@ private:
     /*!
      * Generates aerodynamic database. Settings of geometry,
      * reference quantities, database point settings and analysis methods
-     *  should have been set previously.
+     * should have been set previously.
      */
     void generateCoefficients( );
 
@@ -254,7 +294,7 @@ private:
     /*!
      * Array of vehicle parts.
      */
-    std::vector< boost::shared_ptr< geometric_shapes::LawgsPartGeometry > > vehicleParts_;
+    std::vector< std::shared_ptr< geometric_shapes::LawgsPartGeometry > > vehicleParts_;
 
     //! Multi-array as which indicates which coefficients have been calculated already.
     /*!
@@ -275,14 +315,16 @@ private:
      * Map of angle of attack and -sideslip pair and associated panel inclinations.
      */
     std::map< std::pair< double, double >, std::vector< std::vector< std::vector< double > > > >
-            previouslyComputedInclinations_;
+    previouslyComputedInclinations_;
 
     //! Three-dimensional array of panel pressure coefficients.
     /*!
      * Three-dimensional array of panel pressure coefficients at current values
      * of independent variables. Indices indicate part-line-point.
      */
-    std::vector< std::vector< std::vector< double > > > pressureCoefficient_;
+     std::vector< std::vector< std::vector< double > > > pressureCoefficient_;
+
+     std::map< boost::array< int, 3 >,  std::vector< std::vector< std::vector< double > > > > pressureCoefficientList_;
 
     //! Stagnation pressure coefficient.
     /*!
@@ -296,17 +338,39 @@ private:
      * Ratio of specific heat at constant pressure to specific heat at constant pressure.
      */
     double ratioOfSpecificHeats;
-\
+    \
     //! Array of selected methods.
     /*!
      * Array of selected methods, first index represents compression/expansion,
      * second index represents vehicle part.
      */
     std::vector< std::vector< int > > selectedMethods_;
+
+    bool savePressureCoefficients_;
 };
 
+
+//! Function that saves the vehicle mesh data used for a HypersonicLocalInclinationAnalysis to a file
+/*!
+ * Function that saves the vehicle mesh data used for a HypersonicLocalInclinationAnalysis to a file: specifically, the
+ * panel centroids and surface normals, to file names:
+ *
+ *     <directory>/<filePrefix>"ShapeFile.dat"
+ *     <directory>/<filePrefix>"SurfaceNormalFile.dat"
+ *
+ * with directory and filePrefix input variables.
+ * \param localInclinationAnalysis Aerodynamic analysis object
+ * \param directory Directory to which the files are to be saved
+ * \param filePrefix File name prefix that is to be used
+ */
+void saveVehicleMeshToFile(
+        const std::shared_ptr< HypersonicLocalInclinationAnalysis > localInclinationAnalysis,
+        const std::string directory,
+        const std::string filePrefix );
+
+
 //! Typedef for shared-pointer to HypersonicLocalInclinationAnalysis object.
-typedef boost::shared_ptr< HypersonicLocalInclinationAnalysis >
+typedef std::shared_ptr< HypersonicLocalInclinationAnalysis >
 HypersonicLocalInclinationAnalysisPointer;
 
 } // namespace aerodynamics

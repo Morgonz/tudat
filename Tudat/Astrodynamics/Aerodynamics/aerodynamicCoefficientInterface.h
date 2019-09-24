@@ -19,12 +19,13 @@
 #include <vector>
 #include <map>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <Eigen/Core>
 
 #include "Tudat/Astrodynamics/Aerodynamics/controlSurfaceAerodynamicCoefficientInterface.h"
 #include "Tudat/Astrodynamics/Aerodynamics/aerodynamics.h"
 #include "Tudat/Basics/utilities.h"
+
 namespace tudat
 {
 namespace aerodynamics
@@ -127,9 +128,11 @@ public:
      *  (doubles) which represent the variables from which the coefficients are calculated
      *  \param independentVariables Independent variables of force and moment coefficient
      *  determination implemented by derived class
+     *  \param currentTime Time to which coefficients are to be updated
      */
     virtual void updateCurrentCoefficients(
-            const std::vector< double >& independentVariables ) = 0;
+            const std::vector< double >& independentVariables,
+            const double currentTime = TUDAT_NAN ) = 0;
 
     //! Compute the aerodynamic coefficients for a single control surface, and add to full configuration coefficients.
     /*!
@@ -159,17 +162,19 @@ public:
     //! Function to update the aerodynamic coefficients of the full body with control surfaces
     /*!
      *  Function to update the aerodynamic coefficients of the full body with control surfaces. The full body coefficients
-     *  are cimputed first, after which the control surfaces are updated and the results added to teh full coefficients.
+     *  are cimputed first, after which the control surfaces are updated and the results added to the full coefficients.
      *  \param independentVariables Independent variables of force and moment coefficient of body without control surfaces
      *  \param controlSurfaceIndependentVariables Map of independent variables of force and moment coefficient of
      *  control surfaces, with map key denoting the control surface identifier.
+     *  \param currentTime Time to which coefficients are to be updated.
      */
     void updateFullCurrentCoefficients(
             const std::vector< double >& independentVariables,
             const std::map< std::string, std::vector< double > >& controlSurfaceIndependentVariables =
-            std::map< std::string, std::vector< double > > ( ) )
+            std::map< std::string, std::vector< double > > ( ),
+            const double currentTime = TUDAT_NAN )
     {
-        updateCurrentCoefficients( independentVariables );
+        updateCurrentCoefficients( independentVariables, currentTime );
 
         for( std::map< std::string, std::vector< double > >::const_iterator controlSurfaceIterator =
              controlSurfaceIndependentVariables.begin( ); controlSurfaceIterator != controlSurfaceIndependentVariables.end( );
@@ -205,9 +210,9 @@ public:
      *  Function for calculating and returning aerodynamic force and moment coefficients
      *  \return Force and moment coefficients at given independent variables
      */
-    Eigen::Matrix< double, 6, 1 > getCurrentAerodynamicCoefficients(  )
+    Eigen::Vector6d getCurrentAerodynamicCoefficients(  )
     {
-        Eigen::Matrix< double, 6, 1 > coefficients;
+        Eigen::Vector6d coefficients;
         coefficients.segment( 0, 3 ) = getCurrentForceCoefficients( );
         coefficients.segment( 3, 3 ) = getCurrentMomentCoefficients( );
         return coefficients;
@@ -290,7 +295,7 @@ public:
      * denoting the coefficient interface of a single control sureface, where the map key denotes the surface's name.
      */
     void setControlSurfaceIncrements(
-            const std::map< std::string, boost::shared_ptr< ControlSurfaceIncrementAerodynamicInterface > >
+            const std::map< std::string, std::shared_ptr< ControlSurfaceIncrementAerodynamicInterface > >
             controlSurfaceIncrementInterfaces )
     {
         controlSurfaceIncrementInterfaces_ = controlSurfaceIncrementInterfaces;
@@ -339,7 +344,7 @@ public:
     {
         std::map< std::string, std::vector< AerodynamicCoefficientsIndependentVariables > >
                 controlSurfaceIndependentVariables;
-        for( std::map< std::string, boost::shared_ptr< ControlSurfaceIncrementAerodynamicInterface > >::iterator
+        for( std::map< std::string, std::shared_ptr< ControlSurfaceIncrementAerodynamicInterface > >::iterator
              contolSurfaceIterator = controlSurfaceIncrementInterfaces_.begin( );
              contolSurfaceIterator != controlSurfaceIncrementInterfaces_.end( ); contolSurfaceIterator++ )
         {
@@ -446,7 +451,7 @@ protected:
     bool areCoefficientsInNegativeAxisDirection_;
 
     //! List of control surface aerodynamic coefficient interfaces
-    std::map< std::string, boost::shared_ptr< ControlSurfaceIncrementAerodynamicInterface > >
+    std::map< std::string, std::shared_ptr< ControlSurfaceIncrementAerodynamicInterface > >
     controlSurfaceIncrementInterfaces_;
 
     //! Explicit list of control surface names, in same order as iterator over controlSurfaceIncrementInterfaces_
@@ -456,7 +461,7 @@ private:
 };
 
 //! Typedef for shared-pointer to AerodynamicCoefficientInterface object.
-typedef boost::shared_ptr< AerodynamicCoefficientInterface >
+typedef std::shared_ptr< AerodynamicCoefficientInterface >
 AerodynamicCoefficientInterfacePointer;
 
 } // namespace aerodynamics

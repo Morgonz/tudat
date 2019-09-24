@@ -14,11 +14,11 @@
 
 #include <Eigen/Core>
 
-#include "Tudat/Mathematics/BasicMathematics/mathematicalConstants.h"
 #include "Tudat/Mathematics/NumericalIntegrators/numericalIntegrator.h"
 
 namespace tudat
 {
+
 namespace numerical_integrators
 {
 
@@ -52,26 +52,22 @@ public:
 
     //! Default constructor.
     ReinitializableNumericalIntegrator(
-            const typename NumericalIntegratorBase::StateDerivativeFunction&
-            aStateDerivativeFunction )
+            const typename NumericalIntegratorBase::StateDerivativeFunction& aStateDerivativeFunction )
         : NumericalIntegratorBase( aStateDerivativeFunction )
     { }
 
     //! Default destructor.
     virtual ~ReinitializableNumericalIntegrator( ) { }
 
-    //! Modify the state at the current value of the independent variable.
-    /*!
-     * Modify the state at the current value of the independent variable. This function is pure
-     * virtual; hence it must be implemented in all derived classes.
-     * \param newState The new state to set the current state to.
-     */
-    virtual void modifyCurrentState( const StateType& newState ) = 0;
-
 protected:
 
 private:
+
 };
+
+extern template class ReinitializableNumericalIntegrator < double, Eigen::VectorXd, Eigen::VectorXd >;
+extern template class ReinitializableNumericalIntegrator < double, Eigen::Vector6d, Eigen::Vector6d >;
+extern template class ReinitializableNumericalIntegrator < double, Eigen::MatrixXd, Eigen::MatrixXd >;
 
 //! Typedef for shared-pointer to default, re-initializable numerical integrator.
 /*!
@@ -79,7 +75,7 @@ private:
  * (IndependentVariableType = double, StateType = Eigen::VectorXd,
  * StateDerivativeType = Eigen::VectorXd).
  */
-typedef boost::shared_ptr< ReinitializableNumericalIntegrator< > >
+typedef std::shared_ptr< ReinitializableNumericalIntegrator< > >
 ReinitializableNumericalIntegratorXdPointer;
 
 //! Typedef for a shared-pointer to a scalar, re-initializable numerical integrator.
@@ -87,11 +83,11 @@ ReinitializableNumericalIntegratorXdPointer;
  * Typedef for shared-pointer to a scalar numerical, re-initializable integrator
  * (IndependentVariableType = double, StateType = double, StateDerivativeType = double).
  */
-typedef boost::shared_ptr< ReinitializableNumericalIntegrator< double, double, double > >
+typedef std::shared_ptr< ReinitializableNumericalIntegrator< double, double, double > >
 ReinitializableNumericalIntegratordPointer;
 
-
 } // namespace numerical_integrators
+
 } // namespace tudat
 
 #endif // TUDAT_REINITIALIZABLE_NUMERICAL_INTEGRATOR_H

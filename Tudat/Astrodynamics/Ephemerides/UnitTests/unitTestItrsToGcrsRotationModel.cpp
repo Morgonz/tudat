@@ -39,8 +39,8 @@ BOOST_AUTO_TEST_CASE( test_ItrsToGcrsRotationAgainstSpice )
     spice_interface::loadSpiceKernelInTudat( input_output::getSpiceKernelPath( ) + "earth_fixed.tf" );
 
     // Create rotation model
-    boost::shared_ptr< GcrsToItrsRotationModel > earthRotationModel =
-            boost::make_shared< GcrsToItrsRotationModel >(
+    std::shared_ptr< GcrsToItrsRotationModel > earthRotationModel =
+            std::make_shared< GcrsToItrsRotationModel >(
                 earth_orientation::createStandardEarthOrientationCalculator( ) );
 
     // Compare spice vs. Tudat for list of evaluation times
@@ -60,6 +60,7 @@ BOOST_AUTO_TEST_CASE( test_ItrsToGcrsRotationAgainstSpice )
         // Check whether Spice and Tudat give same result. Note that Spice model is not accurate up to IERS standards. Comparison
         // is done at 10 cm position difference on Earth surface (per component).
         double tolerance = 0.1 / 6378.0E3;
+
         for( unsigned int i = 0; i < 3; i++ )
         {
             for( unsigned int j = 0; j < 3; j++ )
@@ -69,9 +70,6 @@ BOOST_AUTO_TEST_CASE( test_ItrsToGcrsRotationAgainstSpice )
 
             }
         }
-
-        std::cout << sofaRotationDerivative << std::endl << std::endl
-                  << sofaRotationDerivative - spiceRotationDerivative << std::endl << std::endl << std::endl << std::endl;
     }
 }
 
@@ -91,8 +89,8 @@ BOOST_AUTO_TEST_CASE( test_ItrsToGcrsRotationAgainstSofaCookbook )
             physical_constants::JULIAN_DAY;
 
     // Create Earth rotation model
-    boost::shared_ptr< GcrsToItrsRotationModel > earthRotationModelFromUtc =
-            boost::make_shared< GcrsToItrsRotationModel >(
+    std::shared_ptr< GcrsToItrsRotationModel > earthRotationModelFromUtc =
+            std::make_shared< GcrsToItrsRotationModel >(
                 earth_orientation::createStandardEarthOrientationCalculator( ),
                 utc_scale );
 

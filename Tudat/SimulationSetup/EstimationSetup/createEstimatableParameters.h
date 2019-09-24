@@ -15,6 +15,7 @@
 
 #include "Tudat/Astrodynamics/OrbitDetermination/EstimatableParameters/estimatableParameter.h"
 #include "Tudat/Astrodynamics/OrbitDetermination/EstimatableParameters/initialTranslationalState.h"
+#include "Tudat/Astrodynamics/OrbitDetermination/EstimatableParameters/initialRotationalState.h"
 #include "Tudat/Astrodynamics/BasicAstrodynamics/accelerationModelTypes.h"
 #include "Tudat/SimulationSetup/EstimationSetup/estimatableParameterSettings.h"
 #include "Tudat/SimulationSetup/PropagationSetup/dynamicsSimulator.h"
@@ -34,14 +35,14 @@ namespace simulation_setup
  *  \return Interface object for estimating an initial state.
  */
 template< typename InitialStateParameterType = double >
-boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix
+std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix
 < InitialStateParameterType, Eigen::Dynamic, 1 > > > createInitialDynamicalStateParameterToEstimate(
         const NamedBodyMap& bodyMap,
-        const boost::shared_ptr< estimatable_parameters::EstimatableParameterSettings >& parameterSettings )
+        const std::shared_ptr< estimatable_parameters::EstimatableParameterSettings >& parameterSettings )
 {
     using namespace tudat::estimatable_parameters;
 
-    boost::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > >
+    std::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > >
             initialStateParameterToEstimate;
 
     // Check consistency of input.
@@ -61,17 +62,17 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix
         case initial_body_state:
 
             // Check consistency of input.
-            if( boost::dynamic_pointer_cast<
+            if( std::dynamic_pointer_cast<
                     InitialTranslationalStateEstimatableParameterSettings< InitialStateParameterType > >(
-                        parameterSettings ) == NULL )
+                        parameterSettings ) == nullptr )
             {
                 throw std::runtime_error( "Error when making body initial state parameter, settings type is incompatible" );
             }
             else
             {
-                boost::shared_ptr< InitialTranslationalStateEstimatableParameterSettings< InitialStateParameterType > >
+                std::shared_ptr< InitialTranslationalStateEstimatableParameterSettings< InitialStateParameterType > >
                         initialStateSettings =
-                        boost::dynamic_pointer_cast<
+                        std::dynamic_pointer_cast<
                         InitialTranslationalStateEstimatableParameterSettings< InitialStateParameterType > >(
                             parameterSettings );
 
@@ -96,29 +97,29 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix
 
                 // Create translational state estimation interface object
                 initialStateParameterToEstimate =
-                        boost::make_shared< InitialTranslationalStateParameter< InitialStateParameterType > >(
+                        std::make_shared< InitialTranslationalStateParameter< InitialStateParameterType > >(
                             initialStateSettings->parameterType_.second.first, initialTranslationalState,
                             initialStateSettings->centralBody_,
                             initialStateSettings->frameOrientation_ );
             }
             break;
         case arc_wise_initial_body_state:
-            if( boost::dynamic_pointer_cast< ArcWiseInitialTranslationalStateEstimatableParameterSettings<
-                    InitialStateParameterType > >( parameterSettings ) == NULL )
+            if( std::dynamic_pointer_cast< ArcWiseInitialTranslationalStateEstimatableParameterSettings<
+                    InitialStateParameterType > >( parameterSettings ) == nullptr )
             {
                 throw std::runtime_error(
                             "Error when making body initial state parameter, settings type is incompatible" );
             }
             else
             {
-                boost::shared_ptr< ArcWiseInitialTranslationalStateEstimatableParameterSettings< InitialStateParameterType > >
-                        initialStateSettings =  boost::dynamic_pointer_cast<
+                std::shared_ptr< ArcWiseInitialTranslationalStateEstimatableParameterSettings< InitialStateParameterType > >
+                        initialStateSettings =  std::dynamic_pointer_cast<
                         ArcWiseInitialTranslationalStateEstimatableParameterSettings< InitialStateParameterType > >(
                             parameterSettings );
 
                 if( initialStateSettings->isStateSet_ )
                 {
-                    initialStateParameterToEstimate = boost::make_shared< ArcWiseInitialTranslationalStateParameter<
+                    initialStateParameterToEstimate = std::make_shared< ArcWiseInitialTranslationalStateParameter<
                             InitialStateParameterType > >(
                                 initialStateSettings->parameterType_.second.first,
                                 initialStateSettings->arcStartTimes_,
@@ -128,7 +129,7 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix
                 }
                 else
                 {
-                    initialStateParameterToEstimate = boost::make_shared< ArcWiseInitialTranslationalStateParameter<
+                    initialStateParameterToEstimate = std::make_shared< ArcWiseInitialTranslationalStateParameter<
                             InitialStateParameterType > >(
                                 initialStateSettings->parameterType_.second.first, initialStateSettings->arcStartTimes_,
                                 propagators::getInitialArcWiseStateOfBody< double, InitialStateParameterType >(
@@ -137,6 +138,51 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix
                                     initialStateSettings->arcStartTimes_ ),
                                 initialStateSettings->centralBody_, initialStateSettings->frameOrientation_ );
                 }
+            }
+            break;
+        case initial_rotational_body_state:
+
+            // Check consistency of input.
+            if( std::dynamic_pointer_cast<
+                    InitialRotationalStateEstimatableParameterSettings< InitialStateParameterType > >(
+                        parameterSettings ) == nullptr )
+            {
+                throw std::runtime_error( "Error when making body initial state parameter, settings type is incompatible" );
+            }
+            else
+            {
+                std::shared_ptr< InitialRotationalStateEstimatableParameterSettings< InitialStateParameterType > >
+                        initialStateSettings = std::dynamic_pointer_cast<
+                        InitialRotationalStateEstimatableParameterSettings< InitialStateParameterType > >(
+                            parameterSettings );
+
+                Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > initialRotationalState;
+
+                // If initial time is not defined, use preset initial state
+                if( ! ( initialStateSettings->initialTime_ == initialStateSettings->initialTime_  ) )
+                {
+                    initialRotationalState = initialStateSettings->initialStateValue_;
+
+
+                }
+                // Compute initial state from environment
+                else
+                {
+                    initialRotationalState = propagators::getInitialRotationalStateOfBody
+                            < double, InitialStateParameterType >(
+                                initialStateSettings->parameterType_.second.first, initialStateSettings->baseOrientation_,
+                                bodyMap, initialStateSettings->initialTime_ );
+
+                }
+
+                // Create rotational state estimation interface object
+                initialStateParameterToEstimate =
+                        std::make_shared< InitialRotationalStateParameter< InitialStateParameterType > >(
+                            initialStateSettings->parameterType_.second.first, initialRotationalState,
+                            std::bind( &Body::getBodyInertiaTensor,
+                                         bodyMap.at( initialStateSettings->parameterType_.second.first ) ),
+                            initialStateSettings->baseOrientation_,
+                            initialStateSettings->frameOrientation_ );
             }
             break;
         default:
@@ -158,8 +204,8 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix
  * selected parameters).
  * \return Interface object for estimating parameter.
  */
-boost::shared_ptr< estimatable_parameters::EstimatableParameter< double > > createDoubleParameterToEstimate(
-        const boost::shared_ptr< estimatable_parameters::EstimatableParameterSettings >& doubleParameterName,
+std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > createDoubleParameterToEstimate(
+        const std::shared_ptr< estimatable_parameters::EstimatableParameterSettings >& doubleParameterName,
         const NamedBodyMap& bodyMap, const basic_astrodynamics::AccelerationMap& accelerationModelMap =
         basic_astrodynamics::AccelerationMap( ) );
 
@@ -172,8 +218,8 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameter< double > > crea
  * selected parameters).
  * \return Interface object for estimating parameter.
  */
-boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > createVectorParameterToEstimate(
-        const boost::shared_ptr< estimatable_parameters::EstimatableParameterSettings >& vectorParameterName,
+std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > createVectorParameterToEstimate(
+        const std::shared_ptr< estimatable_parameters::EstimatableParameterSettings >& vectorParameterName,
         const NamedBodyMap& bodyMap, const basic_astrodynamics::AccelerationMap& accelerationModelMap =
         basic_astrodynamics::AccelerationMap( ) );
 
@@ -189,18 +235,18 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd
  *  \return Interface object for estimating a set of parameters.
  */
 template< typename InitialStateParameterType = double >
-boost::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > > createParametersToEstimate(
-        const std::vector< boost::shared_ptr< estimatable_parameters::EstimatableParameterSettings > >& parameterNames,
+std::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > > createParametersToEstimate(
+        const std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameterSettings > >& parameterNames,
         const NamedBodyMap& bodyMap,
         const basic_astrodynamics::AccelerationMap& accelerationModelMap = basic_astrodynamics::AccelerationMap( ) )
 
 {
     using namespace tudat::estimatable_parameters;
 
-    std::vector< boost::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
+    std::vector< std::shared_ptr< EstimatableParameter< Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > >
             initialDynamicalParametersToEstimate;
-    std::vector< boost::shared_ptr< EstimatableParameter< double > > > doubleParametersToEstimate;
-    std::vector< boost::shared_ptr< EstimatableParameter< Eigen::VectorXd > > > vectorParametersToEstimate;
+    std::vector< std::shared_ptr< EstimatableParameter< double > > > doubleParametersToEstimate;
+    std::vector< std::shared_ptr< EstimatableParameter< Eigen::VectorXd > > > vectorParametersToEstimate;
 
     // Iterate over all parameters.
     for( unsigned int i = 0; i < parameterNames.size( ); i++ )
@@ -235,10 +281,178 @@ boost::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialState
         }
     }
 
-    return boost::make_shared< EstimatableParameterSet< InitialStateParameterType > >(
+    return std::make_shared< EstimatableParameterSet< InitialStateParameterType > >(
                 doubleParametersToEstimate, vectorParametersToEstimate, initialDynamicalParametersToEstimate );
 }
 
+//! Function to get the multi-arc parameter equivalent of a single-arc initial state parameter
+/*!
+ *  Function to get the multi-arc parameter equivalent of a single-arc initial state parameter. The initial state arcs are
+ *  provided as input to this function.
+ *  \param singleArcParameter Single-arc parameter object for which the multi-arc equivalent is to be created.
+ *  \param arcStartTimes Vector of start times for separate arcs.
+ *  \return Multi-arc parameter equivalent of single-arc initial state parameter input
+ */
+template< typename StateScalarType >
+std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > >
+getAssociatedMultiArcParameter(
+        const std::shared_ptr< estimatable_parameters::EstimatableParameter<
+        Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > > singleArcParameter,
+        const std::vector< double >& arcStartTimes )
+{
+    std::shared_ptr< estimatable_parameters::EstimatableParameter<
+            Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > >  multiArcParameter;
+
+    // Check state type
+    switch( singleArcParameter->getParameterName( ).first )
+    {
+    case estimatable_parameters::initial_body_state:
+    {
+        // Check input consistency
+        std::shared_ptr< estimatable_parameters::InitialTranslationalStateParameter< StateScalarType > >
+                singleArcTranslationalStateParameter =
+                std::dynamic_pointer_cast< estimatable_parameters::InitialTranslationalStateParameter< StateScalarType > >(
+                    singleArcParameter );
+        if( singleArcTranslationalStateParameter == nullptr )
+        {
+            throw std::runtime_error(
+                        "Error when getting multi-arc parameter from single-arc equivalent, single-arc translational state is inconsistent " );
+        }
+
+        // Retrieve single-arc initial state
+        Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > singleArcInitialState =
+                singleArcTranslationalStateParameter->getParameterValue( );
+
+        // Create multi-arc initial states. First arc initial state is taken from single-arc, other initial states set to zero.
+        Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > multiArcInitialStates =
+                Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 >::Zero( 6 * arcStartTimes.size( ) );
+        multiArcInitialStates.segment( 0, 6 ) = singleArcInitialState;
+
+        // Creater multi-arc parameter
+        multiArcParameter = std::make_shared< estimatable_parameters::ArcWiseInitialTranslationalStateParameter<
+                StateScalarType > >(
+                    singleArcTranslationalStateParameter->getParameterName( ).second.first,
+                    arcStartTimes,
+                    multiArcInitialStates,
+                    singleArcTranslationalStateParameter->getCentralBody( ),
+                    singleArcTranslationalStateParameter->getFrameOrientation( ) );
+        break;
+    }
+    default:
+        throw std::runtime_error( "Error when getting multi-arc parameter from single-arc equivalent, parameter type " +
+                                  boost::lexical_cast< std::string >( singleArcParameter->getParameterName( ).first ) +
+                                  " not recognized." );
+    }
+    return multiArcParameter;
+}
+
+
+//! Function to get initial state vector of estimated dynamical states.
+/*!
+ *  Function to get initial state vector of estimated dynamical states (i.e. presently estimated state at propagation
+ *  start time.
+ *  \param estimatableParameters Object containing all parameters that are to be estimated.
+ *  \param propagatorSettings Object containing propagation settings to be used
+ *  \return State vector of estimated dynamics at propagation start time.
+ */
+template< typename InitialStateParameterType = double >
+void setInitialStateVectorFromParameterSet(
+        const std::shared_ptr< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > > estimatableParameters,
+        const std::shared_ptr< propagators::PropagatorSettings< InitialStateParameterType > > propagatorSettings )
+{
+    typedef Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > VectorType;
+
+    // Retrieve initial dynamical parameters.
+    std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameter<
+            Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > > > > initialDynamicalParameters =
+            estimatableParameters->getEstimatedInitialStateParameters( );
+
+    // Initialize state vector.
+    Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 > initialStateVector =
+            Eigen::Matrix< InitialStateParameterType, Eigen::Dynamic, 1 >::Zero(
+                estimatableParameters->getInitialDynamicalStateParameterSize( ), 1 );
+
+    if( std::dynamic_pointer_cast< propagators::SingleArcPropagatorSettings< InitialStateParameterType > >( propagatorSettings ) != nullptr )
+    {
+        int vectorSize = 0;
+        // Iterate over list of bodies of which the partials of the accelerations acting on them are required.
+        for( unsigned int i = 0; i < initialDynamicalParameters.size( ); i++ )
+        {
+            if( isParameterDynamicalPropertyInitialState( initialDynamicalParameters.at( i )->getParameterName( ).first ) )
+            {
+                int currentParameterSize = initialDynamicalParameters.at( i )->getParameterSize( );
+                initialStateVector.block( vectorSize, 0, currentParameterSize, 1 ) = initialDynamicalParameters.at( i )->getParameterValue( );
+
+                vectorSize += currentParameterSize;
+            }
+        }
+
+        propagatorSettings->resetInitialStates( initialStateVector.block( 0, 0, vectorSize, 1 ) );
+    }
+    else if( std::dynamic_pointer_cast< propagators::MultiArcPropagatorSettings< InitialStateParameterType > >( propagatorSettings ) )
+    {
+        std::shared_ptr< propagators::MultiArcPropagatorSettings< InitialStateParameterType > > multiArcSettings =
+                std::dynamic_pointer_cast< propagators::MultiArcPropagatorSettings< InitialStateParameterType > >( propagatorSettings );
+        std::vector< std::shared_ptr< propagators::SingleArcPropagatorSettings< InitialStateParameterType > > > singleArcSettings =
+                multiArcSettings->getSingleArcSettings( );
+        int numberOfArcs = singleArcSettings.size( );
+
+        for( int i = 0; i < numberOfArcs; i++ )
+        {
+            std::map< propagators::IntegratedStateType, std::map< std::pair< std::string, std::string >, VectorType > > currentArcInitialStates;
+
+            for( unsigned int j = 0; j < initialDynamicalParameters.size( ); j++ )
+            {
+                VectorType currentParameterValue = initialDynamicalParameters.at( j )->getParameterValue( );
+                int currentParameterSize = initialDynamicalParameters.at( j )->getParameterSize( );
+                std::pair< std::string, std::string > bodyIdentifier = initialDynamicalParameters.at( j )->getParameterName( ).second;
+
+                switch( initialDynamicalParameters.at( j )->getParameterName( ).first )
+                {
+                case estimatable_parameters::arc_wise_initial_body_state:
+                {
+                    if( currentParameterSize / numberOfArcs != 6 )
+                    {
+                        throw std::runtime_error( "Error when moving initial states from parameters to propagator settings. Incompatible multi-arc translational state size found" );
+                    }
+
+                    currentArcInitialStates[ propagators::translational_state ][ bodyIdentifier ] = currentParameterValue.segment( i * 6, 6 );
+                    break;
+                }
+                default:
+                    throw std::runtime_error( "Error when moving initial states from parameters to propagator settings. Multi-arc parameter type not recognized" );
+                }
+            }
+            propagators::resetSingleArcInitialStates( singleArcSettings.at( i ), currentArcInitialStates );
+            multiArcSettings->updateInitialStateFromConsituentSettings( );
+        }
+    }
+    else if( std::dynamic_pointer_cast< propagators::HybridArcPropagatorSettings< InitialStateParameterType > >( propagatorSettings ) )
+    {
+        std::shared_ptr< propagators::HybridArcPropagatorSettings< InitialStateParameterType > > hybridArcSettings =
+                std::dynamic_pointer_cast< propagators::HybridArcPropagatorSettings< InitialStateParameterType > >( propagatorSettings );
+
+        std::shared_ptr< propagators::SingleArcPropagatorSettings< InitialStateParameterType > > singleArcSettings =
+                hybridArcSettings->getSingleArcPropagatorSettings( );
+        std::shared_ptr< propagators::MultiArcPropagatorSettings< InitialStateParameterType > > multiArcSettings =
+                hybridArcSettings->getMultiArcPropagatorSettings( );
+
+        setInitialStateVectorFromParameterSet< InitialStateParameterType >(
+                    std::make_shared< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > >(
+                        std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > >( ),
+                        std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > >( ),
+                    estimatableParameters->getEstimatedSingleArcInitialStateParameters( ) ), singleArcSettings );
+        setInitialStateVectorFromParameterSet< InitialStateParameterType >(
+                    std::make_shared< estimatable_parameters::EstimatableParameterSet< InitialStateParameterType > >(
+                        std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > >( ),
+                        std::vector< std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > >( ),
+                    estimatableParameters->getEstimatedMultiArcInitialStateParameters( ) ), multiArcSettings );
+
+        hybridArcSettings->setInitialStatesFromConstituents( );
+
+    }
+
+}
 
 } // namespace simulation_setup
 

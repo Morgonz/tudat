@@ -48,9 +48,9 @@ public:
      * if the variable is true.
      */
     MutualSphericalHarmonicsGravityPartial(
-            const boost::shared_ptr< SphericalHarmonicsGravityPartial >
+            const std::shared_ptr< SphericalHarmonicsGravityPartial >
             accelerationPartialOfShExpansionOfBodyExertingAcceleration,
-            const boost::shared_ptr< SphericalHarmonicsGravityPartial >
+            const std::shared_ptr< SphericalHarmonicsGravityPartial >
             accelerationPartialOfShExpansionOfBodyUndergoingAcceleration,
             const std::string& acceleratedBody, const std::string& acceleratingBody, const bool accelerationUsesMutualAttraction ):
         AccelerationPartial( acceleratedBody, acceleratingBody, basic_astrodynamics::mutual_spherical_harmonic_gravity ),
@@ -105,6 +105,29 @@ public:
                     partialMatrix, !addContribution, startRow, startColumn );
     }
 
+    //! Function for calculating the partial of the acceleration w.r.t. a non-translational integrated state
+    /*!
+     *  Function for calculating the partial of the acceleration w.r.t. a non-translational integrated state
+     *  and adding it to the existing partial block. Function calls constituent spherical harmonic model functions
+     *  \param partialMatrix Block of partial derivatives of where current partial is to be added.
+     *  \param stateReferencePoint Reference point id of propagated state
+     *  \param integratedStateType Type of propagated state for which partial is to be computed.
+     *  \param addContribution Variable denoting whether to return the partial itself (true) or the negative partial (false).
+     */
+    void wrtNonTranslationalStateOfAdditionalBody(
+            Eigen::Block< Eigen::MatrixXd > partialMatrix,
+            const std::pair< std::string, std::string >& stateReferencePoint,
+            const propagators::IntegratedStateType integratedStateType,
+            const bool addContribution )
+    {
+        accelerationPartialOfShExpansionOfBodyExertingAcceleration_->
+                        wrtNonTranslationalStateOfAdditionalBody(
+                            partialMatrix, stateReferencePoint, integratedStateType, true );
+        accelerationPartialOfShExpansionOfBodyUndergoingAcceleration_->
+                        wrtNonTranslationalStateOfAdditionalBody(
+                            partialMatrix, stateReferencePoint, integratedStateType, false );
+    }
+
     //! Function for determining if the acceleration is dependent on a non-translational integrated state.
     /*!
      *  Function for determining if the acceleration is dependent on a non-translational integrated state.
@@ -114,17 +137,21 @@ public:
      *  \param integratedStateType Type of propagated state for which dependency is to be determined.
      *  \return True if dependency exists (non-zero partial), false otherwise.
      */
-    bool isStateDerivativeDependentOnIntegratedNonTranslationalState(
+    bool isStateDerivativeDependentOnIntegratedAdditionalStateTypes(
                 const std::pair< std::string, std::string >& stateReferencePoint,
                 const propagators::IntegratedStateType integratedStateType )
     {
-        if( ( ( stateReferencePoint.first == acceleratingBody_ ||
-              ( stateReferencePoint.first == acceleratedBody_  && accelerationUsesMutualAttraction_ ) )
-              && integratedStateType == propagators::body_mass_state ) )
+        if( accelerationPartialOfShExpansionOfBodyExertingAcceleration_->
+                isStateDerivativeDependentOnIntegratedAdditionalStateTypes( stateReferencePoint, integratedStateType ) ||
+                accelerationPartialOfShExpansionOfBodyUndergoingAcceleration_->
+                isStateDerivativeDependentOnIntegratedAdditionalStateTypes( stateReferencePoint, integratedStateType ) )
         {
-            throw std::runtime_error( "Warning, dependency of central gravity on body masses not yet implemented" );
+            return true;
         }
-        return 0;
+        else
+        {
+            return false;
+        }
     }
 
     //! Function for setting up and retrieving a function returning a partial w.r.t. a double parameter.
@@ -134,8 +161,8 @@ public:
      *  \param parameter Parameter w.r.t. which partial is to be taken.
      *  \return Pair of parameter partial function and number of columns in partial (0 for no dependency, 1 otherwise).
      */
-    std::pair< boost::function< void( Eigen::MatrixXd& ) >, int > getParameterPartialFunction(
-            boost::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter );
+    std::pair< std::function< void( Eigen::MatrixXd& ) >, int > getParameterPartialFunction(
+            std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter );
 
     //! Function for setting up and retrieving a function returning a partial w.r.t. a vector parameter.
     /*!
@@ -144,8 +171,8 @@ public:
      *  \param parameter Parameter w.r.t. which partial is to be taken.
      *  \return Pair of parameter partial function and number of columns in partial (0 for no dependency).
      */
-    std::pair< boost::function<void( Eigen::MatrixXd& ) >, int > getParameterPartialFunction(
-            boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > parameter );
+    std::pair< std::function<void( Eigen::MatrixXd& ) >, int > getParameterPartialFunction(
+            std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > parameter );
 
 
     //! Function to calculate the partial wrt the gravitational parameter.
@@ -187,7 +214,7 @@ public:
      * \return Size (number of columns) of parameter partial. Zero if no dependency, 1 otherwise.
      */
     int setParameterPartialUpdateFunction(
-            boost::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter );
+            std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter );
 
     //! Function to set a dependency of this partial object w.r.t. a given vector parameter.
     /*!
@@ -197,7 +224,7 @@ public:
      * \return Size (number of columns) of parameter partial. Zero if no dependency, size of parameter otherwise.
      */
     int setParameterPartialUpdateFunction(
-            boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > parameter );
+            std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > parameter );
 
 protected:
 
@@ -216,10 +243,10 @@ protected:
     }
 
     //! Partial for spherical harmonic acceleration due to body exerting acceleration
-    boost::shared_ptr< SphericalHarmonicsGravityPartial > accelerationPartialOfShExpansionOfBodyExertingAcceleration_;
+    std::shared_ptr< SphericalHarmonicsGravityPartial > accelerationPartialOfShExpansionOfBodyExertingAcceleration_;
 
     //!  Partial for spherical harmonic acceleration due to body undergoing acceleration
-    boost::shared_ptr< SphericalHarmonicsGravityPartial > accelerationPartialOfShExpansionOfBodyUndergoingAcceleration_;
+    std::shared_ptr< SphericalHarmonicsGravityPartial > accelerationPartialOfShExpansionOfBodyUndergoingAcceleration_;
 
     //! Boolean denoting whether the mutual point mass attraction between the bodies is taken into account
     /*!

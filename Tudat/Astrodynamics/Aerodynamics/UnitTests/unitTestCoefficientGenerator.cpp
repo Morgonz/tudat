@@ -17,7 +17,7 @@
 
 #include <boost/array.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/test/floating_point_comparison.hpp>
 #include <boost/test/unit_test.hpp>
 
@@ -44,11 +44,9 @@ using namespace aerodynamics;
 
 BOOST_AUTO_TEST_SUITE( test_aerodynamic_coefficient_generator )
 
-//! Test coefficient generator.
-BOOST_AUTO_TEST_CASE( testAerodynamicCoefficientGenerator )
+//! Test coefficient generator for hypersonic local inclination.
+BOOST_AUTO_TEST_CASE( testAerodynamicCoefficientGeneratorHypersonicLocalInclination )
 {
-
-
     // Set units of coefficients
     const double expectedValueOfForceCoefficient = 1.0;
 
@@ -59,8 +57,8 @@ BOOST_AUTO_TEST_CASE( testAerodynamicCoefficientGenerator )
     const double toleranceAerodynamicCoefficients5 = 1.0e-4;
 
     // Create test sphere.
-    boost::shared_ptr< geometric_shapes::SphereSegment > sphere
-            = boost::make_shared< geometric_shapes::SphereSegment >( 1.0 );
+    std::shared_ptr< geometric_shapes::SphereSegment > sphere
+            = std::make_shared< geometric_shapes::SphereSegment >( 1.0 );
 
     // Set vehicle in analysis with 10,000 panels.
     std::vector< int > numberOfLines( 1, 31 );
@@ -84,8 +82,8 @@ BOOST_AUTO_TEST_CASE( testAerodynamicCoefficientGenerator )
     analysisMethod[ 1 ][ 0 ] = 1;
 
     // Generate sphere database of aerodynamic coefficients.
-    boost::shared_ptr< HypersonicLocalInclinationAnalysis > coefficientInterface =
-            boost::make_shared< HypersonicLocalInclinationAnalysis >(
+    std::shared_ptr< HypersonicLocalInclinationAnalysis > coefficientInterface =
+            std::make_shared< HypersonicLocalInclinationAnalysis >(
                 independentVariableDataPoints, sphere,
                 numberOfLines, numberOfPoints,
                 invertOrder, analysisMethod, PI, 1.0,
@@ -246,12 +244,12 @@ BOOST_AUTO_TEST_CASE( testAerodynamicCoefficientGenerator )
     }
 }
 
-boost::shared_ptr< HypersonicLocalInclinationAnalysis > getApolloCoefficientInterface( )
+std::shared_ptr< HypersonicLocalInclinationAnalysis > getApolloCoefficientInterface( )
 {
 
     // Create test capsule.
-    boost::shared_ptr< geometric_shapes::Capsule > capsule
-            = boost::make_shared< geometric_shapes::Capsule >(
+    std::shared_ptr< geometric_shapes::Capsule > capsule
+            = std::make_shared< geometric_shapes::Capsule >(
                 4.694, 1.956, 2.662, -1.0 * 33.0 * PI / 180.0, 0.196 );
 
     std::vector< int > numberOfLines( 4 );
@@ -301,11 +299,12 @@ boost::shared_ptr< HypersonicLocalInclinationAnalysis > getApolloCoefficientInte
     selectedMethods[ 1 ][ 3 ] = 3;
 
     // Create analysis object and capsule database.
-    return boost::make_shared< HypersonicLocalInclinationAnalysis >(
+    return std::make_shared< HypersonicLocalInclinationAnalysis >(
                 independentVariableDataPoints, capsule, numberOfLines, numberOfPoints,
                 invertOrders, selectedMethods, PI * pow( capsule->getMiddleRadius( ), 2.0 ),
                 3.9116, momentReference );
 }
+
 //! Apollo capsule test case.
 BOOST_AUTO_TEST_CASE( testApolloCapsule )
 {
@@ -322,7 +321,7 @@ BOOST_AUTO_TEST_CASE( testApolloCapsule )
     const double toleranceAerodynamicCoefficients5 = std::numeric_limits< double >::epsilon( );
 
     // Create aerodynamic coefficients.
-    boost::shared_ptr< HypersonicLocalInclinationAnalysis > coefficientInterface = getApolloCoefficientInterface( );
+    std::shared_ptr< HypersonicLocalInclinationAnalysis > coefficientInterface = getApolloCoefficientInterface( );
 
     // Retrieve coefficients at zero angle of attack for comparison.
     boost::array< int, 3 > independentVariables;

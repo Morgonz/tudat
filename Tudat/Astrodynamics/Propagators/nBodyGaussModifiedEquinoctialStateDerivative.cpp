@@ -71,10 +71,16 @@ Eigen::Vector6d computeGaussPlanetaryEquationsForModifiedEquinoctialElements(
                 semiLatusRectrum  * semiLatusRectrum ) +
             angularMomentumPerUnitGravitationalParameter * recurringTermInFGTerms * accelerationsInRswFrame( 2 );
 
-    //std::cout << accelerationsInRswFrame.transpose( ) << " " << stateDerivative.transpose( ) << " " << parameterW << " "
-    //          << parameterSSquared << " " << angularMomentumPerUnitGravitationalParameter << std::endl;
     return stateDerivative;
 }
+
+template class NBodyGaussModifiedEquinictialStateDerivative< double, double >;
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+template class NBodyGaussModifiedEquinictialStateDerivative< long double, double >;
+template class NBodyGaussModifiedEquinictialStateDerivative< double, Time >;
+template class NBodyGaussModifiedEquinictialStateDerivative< long double, Time >;
+#endif
 
 } // namespace propagators
 

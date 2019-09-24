@@ -10,7 +10,11 @@
 
 # Add source files.
 set(INTERPOLATORS_SOURCES
+  "${SRCROOT}${MATHEMATICSDIR}/Interpolators/cubicSplineInterpolator.cpp"
   "${SRCROOT}${MATHEMATICSDIR}/Interpolators/linearInterpolator.cpp"
+  "${SRCROOT}${MATHEMATICSDIR}/Interpolators/lagrangeInterpolator.cpp"
+  "${SRCROOT}${MATHEMATICSDIR}/Interpolators/interpolator.cpp"
+  "${SRCROOT}${MATHEMATICSDIR}/Interpolators/multiLinearInterpolator.cpp"
 )
 
 # Add header files.
@@ -21,6 +25,7 @@ set(INTERPOLATORS_HEADERS
   "${SRCROOT}${MATHEMATICSDIR}/Interpolators/lagrangeInterpolator.h"
   "${SRCROOT}${MATHEMATICSDIR}/Interpolators/interpolator.h"
   "${SRCROOT}${MATHEMATICSDIR}/Interpolators/lookupScheme.h"
+  "${SRCROOT}${MATHEMATICSDIR}/Interpolators/multiDimensionalInterpolator.h"
   "${SRCROOT}${MATHEMATICSDIR}/Interpolators/oneDimensionalInterpolator.h"
   "${SRCROOT}${MATHEMATICSDIR}/Interpolators/multiLinearInterpolator.h"
   "${SRCROOT}${MATHEMATICSDIR}/Interpolators/piecewiseConstantInterpolator.h"

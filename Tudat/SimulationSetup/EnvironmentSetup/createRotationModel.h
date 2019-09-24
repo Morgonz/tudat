@@ -14,7 +14,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "Tudat/InputOutput/basicInputOutput.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/body.h"
@@ -22,8 +22,6 @@
 #include "Tudat/Astrodynamics/BasicAstrodynamics/physicalConstants.h"
 #include "Tudat/Astrodynamics/BasicAstrodynamics/unitConversions.h"
 #include "Tudat/External/SofaInterface/earthOrientation.h"
-
-
 
 namespace tudat
 {
@@ -40,7 +38,8 @@ enum RotationModelType
 {
     simple_rotation_model,
     spice_rotation_model,
-    gcrs_to_itrs_rotation_model
+    gcrs_to_itrs_rotation_model,
+    synchronous_rotation_model
 };
 
 //! Class for providing settings for rotation model.
@@ -207,7 +206,6 @@ struct EopCorrectionSettings
     std::vector< std::string > argumentMultipliersFile_;
 };
 
-
 //! Settings for creating a GCRS<->ITRS rotation model
 class GcrsToItrsRotationModelSettings: public RotationModelSettings
 {
@@ -216,7 +214,6 @@ public:
     //! Constructor
     /*!
      * \param baseFrameName Name of base frame (typically GCRS, which is default)
-     * \param targetFrameName baseFrameName Target of base frame (typically ITRS, which is default)
      * \param timeScale Time scale in which input to the rotation model class is provided, default TDB
      * \param nutationTheory IAU precession-nutation theory that is to be used.
      * \param eopFile Name of EOP file that is to be used
@@ -226,12 +223,11 @@ public:
      */
     GcrsToItrsRotationModelSettings(
             const basic_astrodynamics::IAUConventions nutationTheory = basic_astrodynamics::iau_2006,
-            const std::string& eopFile = input_output::getEarthOrientationDataFilesPath( ) + "eopc04_08_IAU2000.62-now.txt",
             const std::string baseFrameName = "GCRS",
-            const std::string targetFrameName = "ITRS",
+            const std::string& eopFile = input_output::getEarthOrientationDataFilesPath( ) + "eopc04_08_IAU2000.62-now.txt",
             const basic_astrodynamics::TimeScales inputTimeScale = basic_astrodynamics::tdb_scale,
-            const boost::shared_ptr< EopCorrectionSettings > ut1CorrectionSettings =
-            boost::make_shared< EopCorrectionSettings >(
+            const std::shared_ptr< EopCorrectionSettings > ut1CorrectionSettings =
+            std::make_shared< EopCorrectionSettings >(
                 1.0E-6, 0.0, std::vector< std::string >{
                     input_output::getEarthOrientationDataFilesPath( ) + "utcLibrationAmplitudes.txt",
                     input_output::getEarthOrientationDataFilesPath( ) + "utcOceanTidesAmplitudes.txt" },
@@ -240,8 +236,8 @@ public:
                     "utcLibrationFundamentalArgumentMultipliers.txt",
                     input_output::getEarthOrientationDataFilesPath( ) +
                     "utcOceanTidesFundamentalArgumentMultipliers.txt" } ),
-            const boost::shared_ptr< EopCorrectionSettings > polarMotionCorrectionSettings =
-            boost::make_shared< EopCorrectionSettings >(
+            const std::shared_ptr< EopCorrectionSettings > polarMotionCorrectionSettings =
+            std::make_shared< EopCorrectionSettings >(
                 unit_conversions::convertArcSecondsToRadians< double >( 1.0E-6 ), 0.0, std::vector< std::string >{
                     input_output::getEarthOrientationDataFilesPath( ) +
                     "polarMotionLibrationAmplitudesQuasiDiurnalOnly.txt",
@@ -252,7 +248,7 @@ public:
                     "polarMotionLibrationFundamentalArgumentMultipliersQuasiDiurnalOnly.txt",
                     input_output::getEarthOrientationDataFilesPath( ) +
                     "polarMotionOceanTidesFundamentalArgumentMultipliers.txt" } ) ):
-        RotationModelSettings( gcrs_to_itrs_rotation_model, baseFrameName, targetFrameName ),
+        RotationModelSettings( gcrs_to_itrs_rotation_model, baseFrameName, "ITRS" ),
         inputTimeScale_( inputTimeScale ), nutationTheory_( nutationTheory ), eopFile_( eopFile ),
         eopFileFormat_( "C04" ), ut1CorrectionSettings_( ut1CorrectionSettings ),
         polarMotionCorrectionSettings_( polarMotionCorrectionSettings ){ }
@@ -304,7 +300,7 @@ public:
      * Function to retrieve the settings for short-period UT1-UTC variations
      * \return Settings for short-period UT1-UTC variations
      */
-    boost::shared_ptr< EopCorrectionSettings > getUt1CorrectionSettings( )
+    std::shared_ptr< EopCorrectionSettings > getUt1CorrectionSettings( )
     {
         return ut1CorrectionSettings_;
     }
@@ -314,7 +310,7 @@ public:
      * Function to retrieve the Settings for short-period polar motion variations
      * \return settings for short-period polar motion variations
      */
-    boost::shared_ptr< EopCorrectionSettings > getPolarMotionCorrectionSettings( )
+    std::shared_ptr< EopCorrectionSettings > getPolarMotionCorrectionSettings( )
     {
         return polarMotionCorrectionSettings_;
     }
@@ -334,13 +330,77 @@ private:
     std::string eopFileFormat_;
 
     //! Settings for short-period UT1-UTC variations
-    boost::shared_ptr< EopCorrectionSettings > ut1CorrectionSettings_;
+    std::shared_ptr< EopCorrectionSettings > ut1CorrectionSettings_;
 
     //! Settings for short-period polar motion variations
-    boost::shared_ptr< EopCorrectionSettings > polarMotionCorrectionSettings_;
+    std::shared_ptr< EopCorrectionSettings > polarMotionCorrectionSettings_;
 
 };
 #endif
+
+//! RotationModelSettings derived class for defining settings of a synchronous rotational ephemeris (body-fixed x-axis always
+//! pointing to central body; z-axis along r x v (with r and v the position and velocity w.r.t. central body)
+class SynchronousRotationModelSettings: public RotationModelSettings
+{
+public:
+
+    //! Constructor
+    /*!
+     * Constructor
+     * \param centralBodyName Name of central body to which this body is locked.
+     * \param baseFrameOrientation Base frame of rotation model.
+     * \param targetFrameOrientation Target frame of rotation model.
+     */
+    SynchronousRotationModelSettings(
+            const std::string& centralBodyName,
+            const std::string& baseFrameOrientation,
+            const std::string& targetFrameOrientation ):
+        RotationModelSettings( synchronous_rotation_model, baseFrameOrientation, targetFrameOrientation ),
+        centralBodyName_( centralBodyName ){ }
+
+    //! Function to retrieve name of central body to which this body is locked.
+    /*!
+     * Function to retrieve name of central body to which this body is locked.
+     * \return  Name of central body to which this body is locked.
+     */
+    std::string getCentralBodyName( )
+    {
+        return centralBodyName_;
+    }
+
+private:
+
+    //!  Name of central body to which this body is locked.
+    std::string centralBodyName_;
+};
+
+//! Function to retrieve a state from one of two functions
+/*!
+ *  Function to retrieve a state from one of two functions, typically from an Ephemeris or a Body object.
+ *  \param currentTime Time at which state function is to be evaluated
+ *  \param useFirstFunctionFirst Boolena defining whether stateFunction1 or stateFunction2 is used
+ *  \param stateFunction1 First function returning state as function of time
+ *  \param stateFunction2 Second function returning state as function of time
+ *  \return
+ */
+Eigen::Vector6d getStateFromSelectedStateFunction(
+        const double currentTime,
+        const bool useFirstFunction,
+        const std::function< Eigen::Vector6d( const double ) > stateFunction1,
+        const std::function< Eigen::Vector6d( const double ) > stateFunction2 );
+
+//! Function to create a state function for a body, valid both during propagation, and outside propagation
+/*!
+ * Function to create a state function for a body, valid both during propagation, and outside propagation
+ * \param bodyMap List of body objects
+ * \param orbitingBody Body for which state function is to be created
+ * \param centralBody Central body w.r.t. which state function is to be created
+ * \return Required state function
+ */
+std::function< Eigen::Vector6d( const double, bool ) > createRelativeStateFunction(
+        const NamedBodyMap& bodyMap,
+        const std::string orbitingBody,
+        const std::string centralBody );
 
 //! Function to create a rotation model.
 /*!
@@ -350,9 +410,10 @@ private:
  *  \param body Name of the body for which the rotation model is to be created.
  *  \return Rotation model created according to settings in rotationModelSettings.
  */
-boost::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
-        const boost::shared_ptr< RotationModelSettings > rotationModelSettings,
-        const std::string& body );
+std::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
+        const std::shared_ptr< RotationModelSettings > rotationModelSettings,
+        const std::string& body,
+        const NamedBodyMap& bodyMap = NamedBodyMap( ) );
 
 } // namespace simulation_setup
 

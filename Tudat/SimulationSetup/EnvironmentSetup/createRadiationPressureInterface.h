@@ -11,7 +11,8 @@
 #ifndef TUDAT_CREATERADIATIONPRESSUREINTERFACE_H
 #define TUDAT_CREATERADIATIONPRESSUREINTERFACE_H
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
+#include <functional>
 #include <boost/make_shared.hpp>
 
 #include "Tudat/SimulationSetup/EnvironmentSetup/body.h"
@@ -31,7 +32,9 @@ static const std::map< std::string, double > defaultRadiatedPowerValues =
 //! List of radiation pressure model types.
 enum RadiationPressureType
 {
-    cannon_ball
+    cannon_ball_radiation_pressure_interface,
+    panelled_radiation_pressure_interface,
+    solar_sailing_radiation_pressure_interface
 };
 
 //! Base class for radiation pressure interface settings.
@@ -43,7 +46,7 @@ class RadiationPressureInterfaceSettings
 {
 public:
 
-    //! Constructor
+    //! Constructor.
     /*!
      * Constructor.
      * \param radiationPressureType Type of radiation pressure interface that is to be made.
@@ -108,7 +111,7 @@ public:
     CannonBallRadiationPressureInterfaceSettings(
             const std::string& sourceBody, const double area, const double radiationPressureCoefficient,
             const std::vector< std::string >& occultingBodies = std::vector< std::string >( ) ):
-        RadiationPressureInterfaceSettings( cannon_ball, sourceBody, occultingBodies ),
+        RadiationPressureInterfaceSettings( cannon_ball_radiation_pressure_interface, sourceBody, occultingBodies ),
         area_( area ), radiationPressureCoefficient_( radiationPressureCoefficient ){ }
 
     //! Function to return surface area that undergoes radiation pressure.
@@ -142,6 +145,332 @@ private:
     double radiationPressureCoefficient_;
 };
 
+class PanelledRadiationPressureInterfaceSettings: public RadiationPressureInterfaceSettings
+{
+public:
+
+    /*! Constructor with constant panels orientation in body-fixed frame.
+     * Constructor with constant panels orientation in body-fixed frame.
+     * \param sourceBody Name of body emitting the radiation.
+     * \param emissivities Vector containing the panels emissivities.
+     * \param areas Vector containing the panels areas.
+     * \param diffusionCoefficients Vector containing the diffuse reflection coefficients of the panels.
+     * \param surfaceNormalsInBodyFixedFrame Vector containing the (constant) surface normals of the panels, expressed in the body-fixed frame.
+     * \param occultingBodies List of bodies causing (partial) occultation.
+     */
+    PanelledRadiationPressureInterfaceSettings(
+            const std::string& sourceBody,
+            const std::vector< double >& emissivities,
+            const std::vector< double >& areas,
+            const std::vector< double >& diffusionCoefficients,
+            const std::vector< Eigen::Vector3d >& surfaceNormalsInBodyFixedFrame,
+            const std::vector< std::string >& occultingBodies = std::vector< std::string >( ) ):
+        RadiationPressureInterfaceSettings( panelled_radiation_pressure_interface, sourceBody, occultingBodies ),
+        emissivities_( emissivities ), areas_( areas ),  diffusionCoefficients_( diffusionCoefficients )
+    {
+
+        for ( unsigned int i = 0 ; i < surfaceNormalsInBodyFixedFrame.size() ; i++ )
+        {
+            surfaceNormalsInBodyFixedFrameFunctions_.push_back( [ = ]( const double ){ return surfaceNormalsInBodyFixedFrame[ i ]; } );
+        }
+
+    }
+
+
+    /*! Constructor with time-varying panels orientation in body-fixed frame.
+     * Constructor with time-varying panels orientation in body-fixed frame.
+     * \param sourceBody Name of body emitting the radiation.
+     * \param emissivities Vector containing the panels emissivities.
+     * \param areas Vector containing the panels areas.
+     * \param diffusionCoefficients Vector containing the diffuse reflection coefficients of the panels.
+     * \param surfaceNormalsInBodyFixedFrameFunctions Vector containing the functions describing the panels surface normals,
+     * which depend on time. The surface normals are expressed in the body-fixed frame.
+     * \param occultingBodies List of bodies causing (partial) occultation.
+     */
+    PanelledRadiationPressureInterfaceSettings(
+            const std::string& sourceBody,
+            const std::vector< double >& emissivities,
+            const std::vector< double >& areas,
+            const std::vector< double >& diffusionCoefficients,
+            const std::vector< std::function< Eigen::Vector3d( const double ) > >& surfaceNormalsInBodyFixedFrameFunctions,
+            const std::vector< std::string >& occultingBodies = std::vector< std::string >( ) ):
+        RadiationPressureInterfaceSettings( panelled_radiation_pressure_interface, sourceBody, occultingBodies ),
+        emissivities_( emissivities ), areas_( areas ),  diffusionCoefficients_( diffusionCoefficients ),
+        surfaceNormalsInBodyFixedFrameFunctions_( surfaceNormalsInBodyFixedFrameFunctions ){ }
+
+
+    //! Function to return the panels emissivity vector.
+    /*!
+     *  Function to return the panels emissivity vector.
+     *  \return Vector containing the panels emissivities.
+     */
+    std::vector< double > getEmissivities( )
+    {
+        return emissivities_;
+    }
+
+
+    //! Function to return the panels area vector.
+    /*!
+     *  Function to return the panels area vector.
+     *  \return Vector containing the panels areas.
+     */
+    std::vector< double > getAreas( )
+    {
+        return areas_;
+    }
+
+    //! Function to return the panels diffuse reflection coefficients vector.
+    /*!
+     *  Function to return the panels diffuse reflection coefficients vector.
+     *  \return Vector containing the panels diffuse reflection coefficients.
+     */
+    std::vector< double > getDiffusionCoefficients( )
+    {
+        return diffusionCoefficients_;
+    }
+
+    //! Function to return the panels surface normal vector.
+    /*!
+     *  Function to return the panels surface normal vector.
+     *  \return Vector containing the panels surface normals in body-fixed frame.
+     */
+    std::vector< std::function< Eigen::Vector3d( const double ) > > getSurfaceNormalsInBodyFixedFrameFunctions( )
+    {
+        return surfaceNormalsInBodyFixedFrameFunctions_;
+    }
+
+private:
+
+    //! Vector containing the emissivitie for all panels.
+    std::vector< double > emissivities_;
+
+    //! Vector containing the area for all panels.
+    std::vector< double > areas_;
+
+    //! Vector containing the diffuse reflection coefficient for all panels.
+    std::vector< double > diffusionCoefficients_;
+
+    //! Vector containing the time-dependent functions that return the surface normal for each panel,
+    //! in body-fixed frame.
+    std::vector< std::function< Eigen::Vector3d( const double ) > > surfaceNormalsInBodyFixedFrameFunctions_;
+
+};
+
+
+//! Class providing settings for the creation of a solar sail radiation pressure interface.
+class SolarSailRadiationInterfaceSettings: public RadiationPressureInterfaceSettings
+{
+public:
+
+    /*! Constructor
+     * Constructor
+     * \param sourceBody Name of body emitting the radiation.
+     * \param area Surface area that undergoes radiation pressure [m^2].
+     * \param coneAngle Function returning the current sail cone angle (in rad).
+     * \param clockAngle Function returning the current sail clock angle (in rad).
+     * \param frontEmissivityCoefficient Emissivity coefficient of the front of the sail [-].
+     * \param backEmissivityCoefficient Emissivity coefficient of the back of the sail [-].
+     * \param frontLambertianCoefficient Lambertian coefficient of the front of the sail [-].
+     * \param backLambertianCoefficient Lambertian coefficient of the back of the sail [-].
+     * \param reflectivityCoefficient Reflectivity coefficient of the sail [-].
+     * \param specularReflectionCoefficient Specular reflection coefficient of the sail [-].
+     * \param occultingBodies List of bodies causing (partial) occultation.
+     * \param centralBody Name of the central body.
+     */
+
+    SolarSailRadiationInterfaceSettings(
+        const std::string& sourceBody,
+        const double area,
+        const std::function< double( const double ) > coneAngle,
+        const std::function< double( const double ) > clockAngle,
+        const double frontEmissivityCoefficient,
+        const double backEmissivityCoefficient,
+        const double frontLambertianCoefficient,
+        const double backLambertianCoefficient,
+        const double reflectivityCoefficient,
+        const double specularReflectionCoefficient,
+        const std::vector< std::string >& occultingBodies = std::vector< std::string >( ),
+        const std::string& centralBody = std::string( ) ):
+        RadiationPressureInterfaceSettings( solar_sailing_radiation_pressure_interface, sourceBody, occultingBodies ),
+        area_( area ), coneAngleFunction_( coneAngle ),
+        clockAngleFunction_( clockAngle ), frontEmissivityCoefficient_( frontEmissivityCoefficient ),
+        backEmissivityCoefficient_( backEmissivityCoefficient ),
+        frontLambertianCoefficient_( frontLambertianCoefficient ),
+        backLambertianCoefficient_( backLambertianCoefficient ),
+        reflectivityCoefficient_( reflectivityCoefficient ),
+        specularReflectionCoefficient_( specularReflectionCoefficient ),
+        centralBody_( centralBody ){ }
+
+    //! Function to return surface area that undergoes radiation pressure.
+    /*!
+     *  Function to return surface area that undergoes radiation pressure.
+     *  \return Surface area that undergoes radiation pressure [m^2].
+     */
+    double getArea( ){ return area_; }
+
+    //! Function to set surface area that undergoes radiation pressure.
+    /*!
+     *  Function to set surface area that undergoes radiation pressure.
+     *  \param area Surface area that undergoes radiation pressure [m^2].
+     */
+    void setArea( double area ){ area_ = area; }
+
+    //! Returns the function returning the current sail cone angle.
+    /*!
+     *  Returns the function returning the current sail cone angle.
+     *  \return Function returning the current sail cone angle (in rad).
+     */
+    std::function< double( const double ) > getConeAngle(  ) {return coneAngleFunction_;}
+
+    //! Resets the function returning the current sail cone angle.
+    /*!
+     *  Resets the function returning the current sail cone angle.
+     *  \param Function returning the current sail cone angle (in rad).
+     */
+    void setConeAngle( std::function< double( const double ) > coneAngle ){ coneAngleFunction_ = coneAngle; }
+
+    //! Returns the function returning the current sail clock angle.
+    /*!
+     *  Returns the function returning the current sail clock angle.
+     *  \return Function returning the current clock angle (in rad).
+     */
+    std::function< double( const double ) > getClockAngle(  ) { return clockAngleFunction_; }
+
+    //! Resets the function returning the current sail clock angle.
+    /*!
+     *  Resets the function returning the current sail clock angle.
+     *  \param Function returning the current clock angle (in rad).
+     */
+    void setClockAngle( std::function< double( const double ) > clockAngle ){ clockAngleFunction_ = clockAngle; }
+
+    //! Returns front emissivity coefficient.
+    /*!
+     *  Returns front emissivity coefficient.
+     *  \return Front emissivity coefficient [-].
+     */
+    double getFrontEmissivityCoefficient() { return frontEmissivityCoefficient_; }
+
+    //! Resets front emissivity coefficient.
+    /*!
+     *  Resets front emissivity coefficient.
+     *  \param Front emissivity coefficient [-].
+     */
+    void setFrontEmissivityCoefficient( double frontEmissivityCoefficient ){ frontEmissivityCoefficient_ = frontEmissivityCoefficient; }
+
+    //! Returns back emissivity coefficient.
+    /*!
+     *  Returns back emissivity coefficient.
+     *  \return Back emissivity coefficient [-].
+     */
+    double getBackEmissivityCoefficient() { return backEmissivityCoefficient_; }
+
+    //! Resets back emissivity coefficient.
+    /*!
+     *  Resets back emissivity coefficient.
+     *  \param Back emissivity coefficient [-].
+     */
+    void setBackEmissivityCoefficient( double backEmissivityCoefficient ){ backEmissivityCoefficient_ = backEmissivityCoefficient; }
+
+    //! Returns front Lambertian coefficient.
+    /*!
+     *  Returns front Lambertian coefficient.
+     *  \return Front Lambertian coefficient [-].
+     */
+    double getFrontLambertianCoefficient() { return frontLambertianCoefficient_; }
+
+    //! Resets front Lambertian coefficient.
+    /*!
+     *  Resets front Lambertian coefficient.
+     *  \param Front Lambertian coefficient [-].
+     */
+    void setFrontLambertianCoefficient( double frontLambertianCoefficient ){ frontLambertianCoefficient_ = frontLambertianCoefficient; }
+
+    //! Returns back Lambertian coefficient.
+    /*!
+     *  Returns back Lambertian coefficient.
+     *  \return Back Lambertian coefficient [-].
+     */
+    double getBackLambertianCoefficient() { return backLambertianCoefficient_; }
+
+    //! Resets back Lambertian coefficient.
+    /*!
+     *  Resets back Lambertian coefficient.
+     *  \param Back Lambertian coefficient [-].
+     */
+    void setBackLambertianCoefficient( double backLambertianCoefficient ){ backLambertianCoefficient_ = backLambertianCoefficient; }
+
+    //! Returns reflectivity coefficient.
+    /*!
+     *  Returns reflectivity coefficient.
+     *  \return Reflectivity coefficient [-].
+     */
+    double getReflectivityCoefficient() { return reflectivityCoefficient_; }
+
+    //! Resets reflectivity coefficient.
+    /*!
+     *  Resets reflectivity coefficient.
+     *  \param Reflectivity coefficient [-].
+     */
+    void setReflectivityCoefficient( double reflectivityCoefficient ){ reflectivityCoefficient_ = reflectivityCoefficient; }
+
+    //! Returns specular reflection coefficient.
+    /*!
+     *  Returns specular reflection coefficient.
+     *  \return Specular reflection coefficient [-].
+     */
+    double getSpecularReflectionCoefficient() { return specularReflectionCoefficient_; }
+
+    //! Resets specular reflection coefficient.
+    /*!
+     *  Resets specular reflection coefficient.
+     *  \param Specular reflection coefficient [-].
+     */
+    void setSpecularReflectionCoefficient( double specularReflectionCoefficient ){ specularReflectionCoefficient_ = specularReflectionCoefficient; }
+
+    //! Returns the name of the central body.
+    /*!
+     *  Returns the name of the central body.
+     *  \return Name of the central body.
+     */
+    std::string getCentralBody( ){ return centralBody_; }
+
+
+private:
+
+    //! Surface area that undergoes radiation pressure [m^2].
+    double area_;
+
+    //! Cone angle of the sail [rad].
+    std::function< double( const double ) > coneAngleFunction_;
+
+    //! Clock angle of the sail [rad].
+    std::function< double( const double ) > clockAngleFunction_;
+
+    //! Front emissivity coefficient of the sail [-].
+    double frontEmissivityCoefficient_;
+
+    //! Back emissivity coefficient of the sail [-].
+    double backEmissivityCoefficient_;
+
+    //! Front Lambertian coefficient of the sail [-].
+    double frontLambertianCoefficient_;
+
+    //! Back lambertian coefficient of the sail [-].
+    double backLambertianCoefficient_;
+
+    //! Reflectivity coefficient of the sail [-].
+    double reflectivityCoefficient_;
+
+    //! Specular reflection coefficient of the sail [-].
+    double specularReflectionCoefficient_;
+
+    //! Name of the central body.
+    std::string centralBody_;
+
+};
+
+
 //! Function to obtain (by reference) the position functions and radii of occulting bodies
 /*!
  * Function to obtain (by reference) the position functions and radii of occulting bodies.
@@ -154,8 +483,22 @@ private:
  */
 void getOccultingBodiesInformation(
         const NamedBodyMap& bodyMap, const std::vector< std::string >& occultingBodies,
-        std::vector< boost::function< Eigen::Vector3d( ) > >& occultingBodyPositions,
+        std::vector< std::function< Eigen::Vector3d( ) > >& occultingBodyPositions,
         std::vector< double >& occultingBodyRadii );
+
+
+//! Function to obtain (by reference) the position functions and velocity of the central body.
+/*!
+ * Function to obtain (by reference) the position functions and velocity of the central body.
+ * \param bodyMap List of body objects.
+ * \param centralBody Name of the central body.
+ * \param centralBodyPosition Central body's position function (return by reference output variable).
+ * \param centralBodyVelocity Central body's velocity function (return by reference output variable).
+ */
+void getCentralBodyInformation(
+    const NamedBodyMap& bodyMap, const std::string& centralBody,
+    std::function< Eigen::Vector3d( ) >& centralBodyPosition,
+    std::function< Eigen::Vector3d( ) >& centralBodyVelocity);
 
 //! Function to create a radiation pressure interface.
 /*!
@@ -165,8 +508,8 @@ void getOccultingBodiesInformation(
  *  \param bodyMap List of body objects to use for creation of radiation pressure interface.
  *  \return Radiation pressure interface pointer of requested type and settings.
  */
-boost::shared_ptr< electro_magnetism::RadiationPressureInterface > createRadiationPressureInterface(
-        const boost::shared_ptr< RadiationPressureInterfaceSettings > radiationPressureInterfaceSettings,
+std::shared_ptr< electro_magnetism::RadiationPressureInterface > createRadiationPressureInterface(
+        const std::shared_ptr< RadiationPressureInterfaceSettings > radiationPressureInterfaceSettings,
         const std::string& bodyName, const NamedBodyMap& bodyMap );
 
 

@@ -19,6 +19,7 @@
 
 #if USE_SOFA
 #include "Tudat/Astrodynamics/Ephemerides/itrsToGcrsRotationModel.h"
+#include "Tudat/Astrodynamics/Ephemerides/synchronousRotationalEphemeris.h"
 #include "Tudat/Astrodynamics/EarthOrientation/earthOrientationCalculator.h"
 #include "Tudat/Astrodynamics/EarthOrientation/shortPeriodEarthOrientationCorrectionCalculator.h"
 #include "Tudat/Mathematics/Interpolators/jumpDataLinearInterpolator.h"
@@ -30,15 +31,72 @@ namespace tudat
 namespace simulation_setup
 {
 
+//! Function to retrieve a state from one of two functions
+Eigen::Vector6d getStateFromSelectedStateFunction(
+        const double currentTime,
+        const bool useFirstFunction,
+        const std::function< Eigen::Vector6d( const double ) > stateFunction1,
+        const std::function< Eigen::Vector6d( const double ) > stateFunction2 )
+{
+    return ( useFirstFunction ) ? ( stateFunction1( currentTime ) ) : ( stateFunction2( currentTime ) );
+}
+
+
+//! Function to create a state function for a body, valid both during propagation, and outside propagation
+std::function< Eigen::Vector6d( const double, bool ) > createRelativeStateFunction(
+        const NamedBodyMap& bodyMap,
+        const std::string orbitingBody,
+        const std::string centralBody )
+{
+    // Retrieve state functions for relevant bodies (obtained from current state of body objects)
+    std::function< Eigen::Vector6d( const double ) > bodyInertialStateFunction =
+            std::bind( &Body::getState, bodyMap.at( orbitingBody ) );
+    std::function< Eigen::Vector6d( const double ) > centralBodyInertialStateFunction =
+            std::bind( &Body::getState, bodyMap.at(  centralBody ) );
+
+    // Define relative state function from body object
+    std::function< Eigen::Vector6d( const double ) > fromBodyStateFunction =
+            std::bind(
+                &ephemerides::getDifferenceBetweenStates, bodyInertialStateFunction,
+                centralBodyInertialStateFunction, std::placeholders::_1 );
+
+    // Define state function from ephemeris
+    std::function< Eigen::Vector6d( const double ) > fromEphemerisStateFunction;
+
+    if( bodyMap.at( orbitingBody )->getEphemeris( )->getReferenceFrameOrigin( ) == centralBody )
+    {
+        fromEphemerisStateFunction = std::bind( &ephemerides::Ephemeris::getCartesianState,
+                                                bodyMap.at( orbitingBody )->getEphemeris( ), std::placeholders::_1 );
+
+    }
+    else
+    {
+        std::function< Eigen::Vector6d( const double ) > ephemerisInertialStateFunction =
+                std::bind( &Body::getStateInBaseFrameFromEphemeris< double, double >, bodyMap.at( orbitingBody ),
+                           std::placeholders::_1 );
+        std::function< Eigen::Vector6d( const double ) > ephemerisCentralBodyInertialStateFunction =
+                std::bind( &Body::getStateInBaseFrameFromEphemeris< double, double >, bodyMap.at( centralBody ),
+                           std::placeholders::_1 );
+        fromEphemerisStateFunction = std::bind(
+                    &ephemerides::getDifferenceBetweenStates,
+                    ephemerisInertialStateFunction,
+                    ephemerisCentralBodyInertialStateFunction, std::placeholders::_1 );
+    }
+
+    return std::bind( &getStateFromSelectedStateFunction, std::placeholders::_1, std::placeholders::_2,
+                      fromBodyStateFunction, fromEphemerisStateFunction );
+}
+
 //! Function to create a rotation model.
-boost::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
-        const boost::shared_ptr< RotationModelSettings > rotationModelSettings,
-        const std::string& body )
+std::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
+        const std::shared_ptr< RotationModelSettings > rotationModelSettings,
+        const std::string& body,
+        const NamedBodyMap& bodyMap )
 {
     using namespace tudat::ephemerides;
 
     // Declare return object.
-    boost::shared_ptr< RotationalEphemeris > rotationalEphemeris;
+    std::shared_ptr< RotationalEphemeris > rotationalEphemeris;
 
     // Check which type of rotation model is to be created.
     switch( rotationModelSettings->getRotationType( ) )
@@ -46,9 +104,9 @@ boost::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
     case simple_rotation_model:
     {
         // Check whether settings for simple rotation model are consistent with its type.
-        boost::shared_ptr< SimpleRotationModelSettings > simpleRotationSettings =
-                boost::dynamic_pointer_cast< SimpleRotationModelSettings >( rotationModelSettings );
-        if( simpleRotationSettings == NULL )
+        std::shared_ptr< SimpleRotationModelSettings > simpleRotationSettings =
+                std::dynamic_pointer_cast< SimpleRotationModelSettings >( rotationModelSettings );
+        if( simpleRotationSettings == nullptr )
         {
             throw std::runtime_error(
                         "Error, expected simple rotation model settings for " + body );
@@ -56,7 +114,7 @@ boost::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
         else
         {
             // Create and initialize simple rotation model.
-            rotationalEphemeris = boost::make_shared< SimpleRotationalEphemeris >(
+            rotationalEphemeris = std::make_shared< SimpleRotationalEphemeris >(
                         simpleRotationSettings->getInitialOrientation( ),
                         simpleRotationSettings->getRotationRate( ),
                         simpleRotationSettings->getInitialTime( ),
@@ -70,73 +128,74 @@ boost::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
     {
 
         // Check whether settings for simple rotation model are consistent with its type.
-        boost::shared_ptr< GcrsToItrsRotationModelSettings > gcrsToItrsRotationSettings =
-                boost::dynamic_pointer_cast< GcrsToItrsRotationModelSettings >( rotationModelSettings );
-        if( gcrsToItrsRotationSettings == NULL )
+        std::shared_ptr< GcrsToItrsRotationModelSettings > gcrsToItrsRotationSettings =
+                std::dynamic_pointer_cast< GcrsToItrsRotationModelSettings >( rotationModelSettings );
+        if( gcrsToItrsRotationSettings == nullptr )
         {
             throw std::runtime_error(
                         "Error, expected GCRS to ITRS rotation model settings for " + body );
         }
         else
         {
-            boost::shared_ptr< earth_orientation::EOPReader > eopReader = boost::make_shared< earth_orientation::EOPReader >(
+            std::shared_ptr< earth_orientation::EOPReader > eopReader = std::make_shared< earth_orientation::EOPReader >(
                         gcrsToItrsRotationSettings->getEopFile( ),
                         gcrsToItrsRotationSettings->getEopFileFormat( ),
                         gcrsToItrsRotationSettings->getNutationTheory( ) );
 
             // Load polar motion corrections
-            boost::shared_ptr< interpolators::LinearInterpolator< double, Eigen::Vector2d > > cipInItrsInterpolator =
-                    boost::make_shared< interpolators::LinearInterpolator< double, Eigen::Vector2d > >(
+            std::shared_ptr< interpolators::LinearInterpolator< double, Eigen::Vector2d > > cipInItrsInterpolator =
+                    std::make_shared< interpolators::LinearInterpolator< double, Eigen::Vector2d > >(
                         eopReader->getCipInItrsMapInSecondsSinceJ2000( ) );
 
             // Load nutation corrections
-            boost::shared_ptr< interpolators::LinearInterpolator< double, Eigen::Vector2d > > cipInGcrsCorrectionInterpolator =
-                    boost::make_shared< interpolators::LinearInterpolator< double, Eigen::Vector2d > >(
+            std::shared_ptr< interpolators::LinearInterpolator< double, Eigen::Vector2d > > cipInGcrsCorrectionInterpolator =
+                    std::make_shared< interpolators::LinearInterpolator< double, Eigen::Vector2d > >(
                         eopReader->getCipInGcrsCorrectionMapInSecondsSinceJ2000( ) );
 
             // Create polar motion correction (sub-diural frequencies) object
-            boost::shared_ptr< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< Eigen::Vector2d > >
+            std::shared_ptr< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< Eigen::Vector2d > >
                     shortPeriodPolarMotionCalculator =
-                    boost::make_shared< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< Eigen::Vector2d > >(
+                    std::make_shared< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< Eigen::Vector2d > >(
                         gcrsToItrsRotationSettings->getPolarMotionCorrectionSettings( )->conversionFactor_,
                         gcrsToItrsRotationSettings->getPolarMotionCorrectionSettings( )->minimumAmplitude_,
                         gcrsToItrsRotationSettings->getPolarMotionCorrectionSettings( )->amplitudesFiles_,
                         gcrsToItrsRotationSettings->getPolarMotionCorrectionSettings( )->argumentMultipliersFile_ );
 
             // Create full polar motion calculator
-            boost::shared_ptr< earth_orientation::PolarMotionCalculator > polarMotionCalculator =
-                    boost::make_shared< earth_orientation::PolarMotionCalculator >
+            std::shared_ptr< earth_orientation::PolarMotionCalculator > polarMotionCalculator =
+                    std::make_shared< earth_orientation::PolarMotionCalculator >
                     ( cipInItrsInterpolator, shortPeriodPolarMotionCalculator );
 
             // Create IAU 2006 precession/nutation calculator
-            boost::shared_ptr< earth_orientation::PrecessionNutationCalculator > precessionNutationCalculator =
-                    boost::make_shared< earth_orientation::PrecessionNutationCalculator >(
+            std::shared_ptr< earth_orientation::PrecessionNutationCalculator > precessionNutationCalculator =
+                    std::make_shared< earth_orientation::PrecessionNutationCalculator >(
                         gcrsToItrsRotationSettings->getNutationTheory( ), cipInGcrsCorrectionInterpolator );
 
             // Create UT1 correction (sub-diural frequencies) object
-            boost::shared_ptr< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< double > >
+            std::shared_ptr< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< double > >
                     ut1CorrectionSettings =
-                    boost::make_shared< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< double > >(
+                    std::make_shared< earth_orientation::ShortPeriodEarthOrientationCorrectionCalculator< double > >(
                         gcrsToItrsRotationSettings->getUt1CorrectionSettings( )->conversionFactor_,
                         gcrsToItrsRotationSettings->getUt1CorrectionSettings( )->minimumAmplitude_,
                         gcrsToItrsRotationSettings->getUt1CorrectionSettings( )->amplitudesFiles_,
                         gcrsToItrsRotationSettings->getUt1CorrectionSettings( )->argumentMultipliersFile_ );
 
-            boost::shared_ptr< interpolators::OneDimensionalInterpolator < double, double > > dailyUtcUt1CorrectionInterpolator =
-                    boost::make_shared< interpolators::JumpDataLinearInterpolator< double, double > >(
+            std::shared_ptr< interpolators::OneDimensionalInterpolator < double, double > > dailyUtcUt1CorrectionInterpolator =
+                    std::make_shared< interpolators::JumpDataLinearInterpolator< double, double > >(
                         eopReader->getUt1MinusUtcMapInSecondsSinceJ2000( ), 0.5, 1.0 );
 
             // Create default time scale converter
-            boost::shared_ptr< earth_orientation::TerrestrialTimeScaleConverter > terrestrialTimeScaleConverter =
-                    boost::make_shared< earth_orientation::TerrestrialTimeScaleConverter >
+            std::shared_ptr< earth_orientation::TerrestrialTimeScaleConverter > terrestrialTimeScaleConverter =
+                    std::make_shared< earth_orientation::TerrestrialTimeScaleConverter >
                     (  dailyUtcUt1CorrectionInterpolator, ut1CorrectionSettings );
 
             // Create rotation model
-            boost::shared_ptr< earth_orientation::EarthOrientationAnglesCalculator > earthOrientationCalculator =
-                    boost::make_shared< earth_orientation::EarthOrientationAnglesCalculator >(
+            std::shared_ptr< earth_orientation::EarthOrientationAnglesCalculator > earthOrientationCalculator =
+                    std::make_shared< earth_orientation::EarthOrientationAnglesCalculator >(
                         polarMotionCalculator, precessionNutationCalculator, terrestrialTimeScaleConverter );
-            rotationalEphemeris = boost::make_shared< ephemerides::GcrsToItrsRotationModel >(
-                        earthOrientationCalculator, gcrsToItrsRotationSettings->getInputTimeScale( ) );
+            rotationalEphemeris = std::make_shared< ephemerides::GcrsToItrsRotationModel >(
+                        earthOrientationCalculator, gcrsToItrsRotationSettings->getInputTimeScale( ),
+                        gcrsToItrsRotationSettings->getOriginalFrame( ) );
 
             break;
         }
@@ -148,12 +207,43 @@ boost::shared_ptr< ephemerides::RotationalEphemeris > createRotationModel(
     case spice_rotation_model:
     {
         // Create rotational ephemeris directly from Spice.
-        rotationalEphemeris = boost::make_shared< SpiceRotationalEphemeris >(
+        rotationalEphemeris = std::make_shared< SpiceRotationalEphemeris >(
                     rotationModelSettings->getOriginalFrame( ),
                     rotationModelSettings->getTargetFrame( ) );
         break;
     }
 #endif
+    case synchronous_rotation_model:
+    {
+        std::shared_ptr< SynchronousRotationModelSettings > synchronousRotationSettings =
+                std::dynamic_pointer_cast< SynchronousRotationModelSettings >( rotationModelSettings );
+        if( synchronousRotationSettings == NULL )
+        {
+            throw std::runtime_error( "Error, expected synchronous rotation model settings for " + body );
+        }
+        else
+        {
+            if( bodyMap.at( body )->getEphemeris( )->getReferenceFrameOrigin( ) == synchronousRotationSettings->getCentralBodyName( ) )
+            {
+                if( bodyMap.at( body )->getEphemeris( )->getReferenceFrameOrientation( ) !=
+                        synchronousRotationSettings->getOriginalFrame( ) )
+                {
+                    throw std::runtime_error( "Error, ephemeris of body " + body + " is in " +
+                                              bodyMap.at( body )->getEphemeris( )->getReferenceFrameOrientation( ) +
+                                              " frame when making synchronous rotation model, expected " +
+                                              synchronousRotationSettings->getOriginalFrame( ) + " frame." );
+                }
+            }
+            std::shared_ptr< SynchronousRotationalEphemeris > synchronousRotationalEphemeris = std::make_shared< SynchronousRotationalEphemeris >(
+                        createRelativeStateFunction( bodyMap, body, synchronousRotationSettings->getCentralBodyName( ) ),
+                        synchronousRotationSettings->getCentralBodyName( ),
+                        synchronousRotationSettings->getOriginalFrame( ),
+                        synchronousRotationSettings->getTargetFrame( ) );
+
+            rotationalEphemeris = synchronousRotationalEphemeris;
+        }
+        break;
+    }
     default:
         throw std::runtime_error(
                     "Error, did not recognize rotation model settings type " +

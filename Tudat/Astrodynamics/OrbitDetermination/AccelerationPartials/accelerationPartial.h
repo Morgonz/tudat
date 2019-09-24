@@ -16,7 +16,6 @@
 #include <Eigen/Core>
 
 #include <boost/bind.hpp>
-#include <boost/assign/list_of.hpp>
 
 #include "Tudat/Astrodynamics/BasicAstrodynamics/accelerationModel.h"
 
@@ -51,7 +50,7 @@ public:
      */
     AccelerationPartial( const std::string& acceleratedBody, const std::string& acceleratingBody,
                          const basic_astrodynamics::AvailableAcceleration accelerationType ):
-        StateDerivativePartial( propagators::transational_state, std::make_pair( acceleratedBody, "" ) ),
+        StateDerivativePartial( propagators::translational_state, std::make_pair( acceleratedBody, "" ) ),
         acceleratedBody_( acceleratedBody ), acceleratingBody_( acceleratingBody ),accelerationType_( accelerationType ) { }
 
     //! Virtual destructor.
@@ -64,19 +63,19 @@ public:
      * \param integratedStateType Type of propagated state.
      * \return Pair with function, returning partial derivative, and number of columns in partial vector,
      */
-    std::pair< boost::function< void( Eigen::Block< Eigen::MatrixXd > ) >, int >
+    std::pair< std::function< void( Eigen::Block< Eigen::MatrixXd > ) >, int >
     getDerivativeFunctionWrtStateOfIntegratedBody(
             const std::pair< std::string, std::string >& stateReferencePoint,
             const propagators::IntegratedStateType integratedStateType )
     {
         // Initialize to empty function; 0 parameter size.
-        std::pair< boost::function< void( Eigen::Block< Eigen::MatrixXd > ) >, int >
-                partialFunction = std::make_pair( boost::function< void( Eigen::Block< Eigen::MatrixXd > ) >( ), 0 );
+        std::pair< std::function< void( Eigen::Block< Eigen::MatrixXd > ) >, int >
+                partialFunction = std::make_pair( std::function< void( Eigen::Block< Eigen::MatrixXd > ) >( ), 0 );
 
         // Check if state dependency exists
         switch( integratedStateType )
         {
-        case propagators::transational_state:
+        case propagators::translational_state:
         {
             // Check if reference id is consistent.
             if( stateReferencePoint.second != "" )
@@ -86,16 +85,30 @@ public:
             // Check if propagated body corresponds to accelerated, accelerating, ro relevant third body.
             else if( stateReferencePoint.first == acceleratedBody_ )
             {
-                partialFunction = std::make_pair( boost::bind( &AccelerationPartial::wrtStateOfAcceleratedBody, this, _1 ), 3 );
+                partialFunction = std::make_pair( std::bind( &AccelerationPartial::wrtStateOfAcceleratedBody, this, std::placeholders::_1 ), 3 );
             }
             else if( stateReferencePoint.first == acceleratingBody_ )
             {
-                partialFunction = std::make_pair( boost::bind( &AccelerationPartial::wrtStateOfAcceleratingBody, this, _1 ), 3 );
+                partialFunction = std::make_pair( std::bind( &AccelerationPartial::wrtStateOfAcceleratingBody, this, std::placeholders::_1 ), 3 );
             }
-            else if( isAccelerationPartialWrtAdditionalBodyNonNull( stateReferencePoint.first ) )
+            else if( isAccelerationPartialWrtAdditionalBodyNonnullptr( stateReferencePoint.first ) )
             {
-                partialFunction = std::make_pair( boost::bind( &AccelerationPartial::wrtStateOfAdditionalBody,
-                                                               this, _1, stateReferencePoint.first ), 3 );
+                partialFunction = std::make_pair( std::bind( &AccelerationPartial::wrtStateOfAdditionalBody,
+                                                               this, std::placeholders::_1, stateReferencePoint.first ), 3 );
+            }
+            break;
+        }
+        case propagators::rotational_state:
+        {
+            // Check if reference id is consistent.
+            if( stateReferencePoint.second != "" )
+            {
+                throw std::runtime_error( "Error when getting state derivative partial acceleration model, cannot have reference point on body for body mass" );
+            }
+            else if( isStateDerivativeDependentOnIntegratedAdditionalStateTypes( stateReferencePoint, integratedStateType ) )
+            {
+                partialFunction = std::make_pair( std::bind( &AccelerationPartial::wrtNonTranslationalStateOfAdditionalBody,
+                                                               this, std::placeholders::_1, stateReferencePoint, integratedStateType, true ), 1 );
             }
             break;
         }
@@ -106,11 +119,12 @@ public:
             {
                 throw std::runtime_error( "Error when getting state derivative partial acceleration model, cannot have reference point on body for body mass" );
             }
-            else if( isStateDerivativeDependentOnIntegratedNonTranslationalState( stateReferencePoint, integratedStateType ) )
+            else if( isStateDerivativeDependentOnIntegratedAdditionalStateTypes( stateReferencePoint, integratedStateType ) )
             {
-                partialFunction = std::make_pair( boost::bind( &AccelerationPartial::wrtNonTranslationalStateOfAdditionalBody,
-                                                               this, _1, stateReferencePoint, integratedStateType ), 1 );
+                partialFunction = std::make_pair( std::bind( &AccelerationPartial::wrtNonTranslationalStateOfAdditionalBody,
+                                                               this, std::placeholders::_1, stateReferencePoint, integratedStateType, true ), 1 );
             }
+            break;
         }
         case propagators::custom_state:
         {
@@ -136,12 +150,13 @@ public:
      *  \param integratedStateType Type of propagated state for which dependency is to be determined.
      *  \return True if dependency exists (non-zero partial), false otherwise.
      */
-    virtual bool isStateDerivativeDependentOnIntegratedNonTranslationalState(
+    virtual bool isStateDerivativeDependentOnIntegratedAdditionalStateTypes(
             const std::pair< std::string, std::string >& stateReferencePoint,
             const propagators::IntegratedStateType integratedStateType )
     {
         return false;
     }
+
 
     //! Function to check whether a partial w.r.t. some integrated state is non-zero.
     /*!
@@ -159,7 +174,7 @@ public:
         // Check if state is translational.
         switch( integratedStateType )
         {
-        case propagators::transational_state:
+        case propagators::translational_state:
         {
             // Check if reference id is consistent.
             if( stateReferencePoint.second != "" )
@@ -169,14 +184,14 @@ public:
 
             // Check if propagated body corresponds to accelerated, accelerating, ro relevant third body.
             else if( stateReferencePoint.first == acceleratedBody_ || stateReferencePoint.first == acceleratingBody_ ||
-                     isAccelerationPartialWrtAdditionalBodyNonNull( stateReferencePoint.first ) )
+                     isAccelerationPartialWrtAdditionalBodyNonnullptr( stateReferencePoint.first ) )
             {
                 isDependent = 1;
             }
             break;
         }
         default:
-            isDependent = isStateDerivativeDependentOnIntegratedNonTranslationalState( stateReferencePoint, integratedStateType );
+            isDependent = isStateDerivativeDependentOnIntegratedAdditionalStateTypes( stateReferencePoint, integratedStateType );
             break;
         }
         return isDependent;
@@ -318,11 +333,13 @@ public:
      *  \param partialMatrix Block of partial derivatives of where current partial is to be added.
      *  \param stateReferencePoint Reference point id of propagated state
      *  \param integratedStateType Type of propagated state for which partial is to be computed.
+     *  \param addContribution Variable denoting whether to return the partial itself (true) or the negative partial (false).
      */
     virtual void wrtNonTranslationalStateOfAdditionalBody(
             Eigen::Block< Eigen::MatrixXd > partialMatrix,
             const std::pair< std::string, std::string >& stateReferencePoint,
-            const propagators::IntegratedStateType integratedStateType ){ }
+            const propagators::IntegratedStateType integratedStateType,
+            const bool addContribution = true ){ }
 
     //! Function to check whether the partial derivative w.r.t. the translational state of a third body is non-zero.
     /*!
@@ -331,7 +348,7 @@ public:
      * \param bodyName Name of third body.
      * \return True if third body dependency exists, false otherwise.
      */
-    virtual bool isAccelerationPartialWrtAdditionalBodyNonNull( const std::string& bodyName )
+    virtual bool isAccelerationPartialWrtAdditionalBodyNonnullptr( const std::string& bodyName )
     {
         return 0;
     }

@@ -26,14 +26,13 @@ namespace basic_mathematics
 //! Cache object in which variables that are required for the computation of spherical harmonic potential are stored.
 /*!
  *  Cache object in which variables that are required for the computation of spherical harmonic potential are stored.
- *  The variables are the Legendre polynomials at the required degree and order, the cosine of teh latitude, the
+ *  The variables are the Legendre polynomials at the required degree and order, the cosine of the latitude, the
  *  sine and cosine of the order times the longitude, and the ratio of the distance and the reference radius to the
  *  power degree + 1.
  */
 class SphericalHarmonicsCache
 {
 public:
-
 
     //! Default constructor, initializes cache object with 0 maximum degree and order.
     /*!
@@ -43,8 +42,7 @@ public:
      */
     SphericalHarmonicsCache( const bool useGeodesyNormalization = 1 )
     {
-        legendreCache_ = boost::make_shared< LegendreCache >( useGeodesyNormalization );
-
+        legendreCache_ = std::make_shared< LegendreCache >( useGeodesyNormalization );
         currentLongitude_ = TUDAT_NAN;
         referenceRadiusRatio_ = TUDAT_NAN;
 
@@ -61,7 +59,7 @@ public:
      */
     SphericalHarmonicsCache( const int maximumDegree, const int maximumOrder, const bool useGeodesyNormalization = 1 )
     {
-        legendreCache_ = boost::make_shared< LegendreCache >( maximumDegree, maximumOrder, useGeodesyNormalization );
+        legendreCache_ = std::make_shared< LegendreCache >( maximumDegree, maximumOrder, useGeodesyNormalization );
 
         currentLongitude_ = TUDAT_NAN;
         referenceRadiusRatio_ = TUDAT_NAN;
@@ -163,7 +161,7 @@ public:
      * Function to get object for caching and computing Legendre polynomials.
      * \return Object for caching and computing Legendre polynomials.
      */
-    boost::shared_ptr< LegendreCache > getLegendreCache( )
+    std::shared_ptr< LegendreCache > getLegendreCache( )
     {
         return legendreCache_;
     }
@@ -240,9 +238,7 @@ private:
     std::vector< double > referenceRadiusRatioPowers_;
 
     //! Object for caching and computing Legendre polynomials.
-    boost::shared_ptr< LegendreCache > legendreCache_;
-
-
+    std::shared_ptr< LegendreCache > legendreCache_;
 
 };
 
@@ -396,7 +392,7 @@ Eigen::Vector3d computePotentialGradient( const Eigen::Vector3d& sphericalPositi
                                           const double sineHarmonicCoefficient,
                                           const double legendrePolynomial,
                                           const double legendrePolynomialDerivative,
-                                          const boost::shared_ptr< SphericalHarmonicsCache > sphericalHarmonicsCache );
+                                          const std::shared_ptr< SphericalHarmonicsCache > sphericalHarmonicsCache );
 
 } // namespace basic_mathematics
 } // namespace tudat

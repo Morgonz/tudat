@@ -31,9 +31,9 @@
 #include <Tudat/Mathematics/NumericalIntegrators/numericalIntegrator.h>
 #include <Tudat/Mathematics/BasicMathematics/mathematicalConstants.h>
 
-
 namespace tudat
 {
+
 namespace numerical_integrators
 {
 
@@ -65,7 +65,7 @@ std::vector< unsigned int > getBulirschStoerStepSequence(
  *          either a float or double.
  * \sa NumericalIntegrator.
  */
-template < typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
+template< typename IndependentVariableType = double, typename StateType = Eigen::VectorXd,
            typename StateDerivativeType = Eigen::VectorXd, typename TimeStepType = double >
 class BulirschStoerVariableStepSizeIntegrator :
         public NumericalIntegrator< IndependentVariableType, StateType, StateDerivativeType, TimeStepType >
@@ -189,6 +189,8 @@ public:
         }
     }
 
+    ~BulirschStoerVariableStepSizeIntegrator( ){ }
+
     //! Get step size of the next step.
     /*!
      * Returns the step size of the next step.
@@ -300,6 +302,7 @@ public:
                 }
             }
         }
+
         if( !stepSuccessful )
         {
             if( safetyFactorForNextStepSize_ * errorScaleTerm < minimumFactorDecreaseForNextStepSize_ )
@@ -323,15 +326,17 @@ public:
             if( errorScaleTerm > maximumFactorIncreaseForNextStepSize_ )
             {
                 this->stepSize_ = stepSize * maximumFactorIncreaseForNextStepSize_;
-                if(  std::fabs( this->stepSize_ ) >=  std::fabs( maximumStepSize_ ) )
-                {
-                   this->stepSize_ = stepSize / ( std::fabs( stepSize ) ) * maximumStepSize_ ;
-                }
             }
             else
             {
                 this->stepSize_ = stepSize * errorScaleTerm;
             }
+
+            if(  std::fabs( this->stepSize_ ) >=  std::fabs( maximumStepSize_ ) )
+            {
+               this->stepSize_ = stepSize / ( std::fabs( stepSize ) ) * maximumStepSize_ ;
+            }
+
         }
 
 
@@ -371,9 +376,23 @@ public:
         return lastIndependentVariable_;
     }
 
+    //! Get previous state value.
+    /*!
+     * Returns the previous value of the state.
+     * \return Previous state
+     */
     StateType getPreviousState( )
     {
         return lastState_;
+    }
+
+    void modifyCurrentState( const StateType& newState, const bool allowRollback = false )
+    {
+        currentState_ = newState;
+        if ( !allowRollback )
+        {
+            this->lastIndependentVariable_ = currentIndependentVariable_;
+        }
     }
 
 private:
@@ -493,6 +512,11 @@ private:
 
 };
 
+extern template class BulirschStoerVariableStepSizeIntegrator < double, Eigen::VectorXd, Eigen::VectorXd >;
+extern template class BulirschStoerVariableStepSizeIntegrator < double, Eigen::Vector6d, Eigen::Vector6d >;
+extern template class BulirschStoerVariableStepSizeIntegrator < double, Eigen::MatrixXd, Eigen::MatrixXd >;
+
+
 //! Typedef of variable-step size Bulirsch-Stoer integrator (state/state derivative = VectorXd,
 //! independent variable = double).
 /*!
@@ -502,6 +526,7 @@ private:
 typedef BulirschStoerVariableStepSizeIntegrator< > BulirschStoerVariableStepSizeIntegratorXd;
 
 } // namespace numerical_integrators
+
 } // namespace tudat
 
 #endif // TUDAT_BULIRSCH_STOER_VARIABLE_STEP_SIZE_INTEGRATOR_H

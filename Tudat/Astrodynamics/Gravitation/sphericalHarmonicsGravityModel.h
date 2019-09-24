@@ -1,10 +1,4 @@
-/*    Copyright (c) 2010-2018, Delft University of Technology
- *    All rigths reserved
- *
- *    This file is part of the Tudat. Redistribution and use in source and
- *    binary forms, with or without modification, are permitted exclusively
- *    under the terms of the Modified BSD license. You should have received
- *    a copy of the license with this file. If not, please or visit:
+/*
  *    http://tudat.tudelft.nl/LICENSE.
  *
  *    References
@@ -20,9 +14,11 @@
 #ifndef TUDAT_SPHERICAL_HARMONICS_GRAVITY_MODEL_H
 #define TUDAT_SPHERICAL_HARMONICS_GRAVITY_MODEL_H
 
-#include <boost/function.hpp>
+#include <iostream>
+
+#include <functional>
 #include <boost/lambda/lambda.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/make_shared.hpp>
 
 #include <Eigen/Core>
@@ -75,6 +71,11 @@ namespace gravitation
  *          coefficients. The matrix must be equal in size to cosineHarmonicCoefficients.
  * \param sphericalHarmonicsCache Cache object for computing/retrieving repeated terms in spherical harmonics potential
  *          gradient calculation.
+ * \param accelerationPerTerm List of contributions to accelerations at given degrees/orders, represented by first/second entry
+ *          of map key pair. List is returned by reference only if saveSeparateTerms is set to true.
+ * \param saveSeparateTerms Boolean to denote whether the separate terms in the acceleration are to be stored term by term (in
+ *          accelerationPerTerm map) by reference
+ * \param accelerationRotation Rotation from body-fixed frame (in which coefficients are defined) to inertial frame.
  * \return Cartesian acceleration vector resulting from the summation of all harmonic terms.
  *           The order is important!
  *           acceleration( 0 ) = x acceleration [m s^-2],
@@ -87,7 +88,10 @@ Eigen::Vector3d computeGeodesyNormalizedGravitationalAccelerationSum(
         const double equatorialRadius,
         const Eigen::MatrixXd& cosineHarmonicCoefficients,
         const Eigen::MatrixXd& sineHarmonicCoefficients,
-        boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache );
+        std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
+        std::map< std::pair< int, int >, Eigen::Vector3d >& accelerationPerTerm,
+        const bool saveSeparateTerms = 0,
+        const Eigen::Matrix3d& accelerationRotation = Eigen::Matrix3d::Identity( ) );
 
 //! Compute gravitational acceleration due to single spherical harmonics term.
 /*!
@@ -138,7 +142,7 @@ Eigen::Vector3d computeSingleGeodesyNormalizedGravitationalAcceleration(
         const int order,
         const double cosineHarmonicCoefficient,
         const double sineHarmonicCoefficient,
-        boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache );
+        std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache );
 
 //! Template class for general spherical harmonics gravitational acceleration model.
 /*!
@@ -158,7 +162,7 @@ private:
     typedef SphericalHarmonicsGravitationalAccelerationModelBase< Eigen::Vector3d > Base;
 
     //! Typedef for coefficient-matrix-returning function.
-    typedef boost::function< Eigen::MatrixXd( ) > CoefficientMatrixReturningFunction;
+    typedef std::function< Eigen::MatrixXd( ) > CoefficientMatrixReturningFunction;
 
 public:
 
@@ -197,31 +201,34 @@ public:
             const double anEquatorialRadius,
             const Eigen::MatrixXd aCosineHarmonicCoefficientMatrix,
             const Eigen::MatrixXd aSineHarmonicCoefficientMatrix,
-            const StateFunction positionOfBodyExertingAccelerationFunction
-            = boost::lambda::constant( Eigen::Vector3d::Zero( ) ),
-            const boost::function< Eigen::Quaterniond( ) >
+            const StateFunction positionOfBodyExertingAccelerationFunction =
+            [ ]( ){ return Eigen::Vector3d::Zero( ); },
+            const std::function< Eigen::Quaterniond( ) >
             rotationFromBodyFixedToIntegrationFrameFunction =
-            boost::lambda::constant( Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ) ),
+            [ ]( ){ return Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ); },
             const bool isMutualAttractionUsed = 0,
-            boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache =
-            boost::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )
+            std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache =
+            std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )
         : Base( positionOfBodySubjectToAccelerationFunction,
                 aGravitationalParameter,
                 positionOfBodyExertingAccelerationFunction,
                 isMutualAttractionUsed ),
           equatorialRadius( anEquatorialRadius ),
-          getCosineHarmonicsCoefficients(
-              boost::lambda::constant(aCosineHarmonicCoefficientMatrix ) ),
-          getSineHarmonicsCoefficients( boost::lambda::constant(aSineHarmonicCoefficientMatrix ) ),
+          getCosineHarmonicsCoefficients( [ = ]( ){ return aCosineHarmonicCoefficientMatrix; } ),
+          getSineHarmonicsCoefficients( [ = ]( ){ return aSineHarmonicCoefficientMatrix; } ),
           rotationFromBodyFixedToIntegrationFrameFunction_(
               rotationFromBodyFixedToIntegrationFrameFunction ),
           sphericalHarmonicsCache_( sphericalHarmonicsCache ),
-          currentAcceleration_( Eigen::Vector3d::Zero( ) )
-
+          currentAcceleration_( Eigen::Vector3d::Zero( ) ),
+          saveSphericalHarmonicTermsSeparately_( false )
     {
+        maximumDegree_ = static_cast< int >( getCosineHarmonicsCoefficients( ).rows( ) );
+        maximumOrder_ = static_cast< int >( getCosineHarmonicsCoefficients( ).cols( ) );
         sphericalHarmonicsCache_->resetMaximumDegreeAndOrder(
-                    std::max< int >( static_cast< int >( getCosineHarmonicsCoefficients( ).rows( ) ), sphericalHarmonicsCache_->getMaximumDegree( ) ),
-                    std::max< int >( static_cast< int >( getCosineHarmonicsCoefficients( ).cols( ) ), sphericalHarmonicsCache_->getMaximumOrder( ) ) + 1 );
+                    std::max< int >( maximumDegree_,
+                                     sphericalHarmonicsCache_->getMaximumDegree( ) ),
+                    std::max< int >( maximumOrder_,
+                                     sphericalHarmonicsCache_->getMaximumOrder( ) ) + 1 );
         this->updateMembers( );
     }
 
@@ -254,18 +261,18 @@ public:
      */
     SphericalHarmonicsGravitationalAccelerationModel(
             const StateFunction positionOfBodySubjectToAccelerationFunction,
-            const boost::function< double( ) > aGravitationalParameterFunction,
+            const std::function< double( ) > aGravitationalParameterFunction,
             const double anEquatorialRadius,
             const CoefficientMatrixReturningFunction cosineHarmonicCoefficientsFunction,
             const CoefficientMatrixReturningFunction sineHarmonicCoefficientsFunction,
             const StateFunction positionOfBodyExertingAccelerationFunction
-            = boost::lambda::constant( Eigen::Vector3d::Zero( ) ),
-            const boost::function< Eigen::Quaterniond( ) >
+            = [ ]( ){ return Eigen::Vector3d::Zero( ); },
+            const std::function< Eigen::Quaterniond( ) >
             rotationFromBodyFixedToIntegrationFrameFunction =
-            boost::lambda::constant( Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ) ),
+            [ ]( ){ return Eigen::Quaterniond( Eigen::Matrix3d::Identity( ) ); },
             const bool isMutualAttractionUsed = 0,
-            boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache
-            = boost::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )
+            std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache
+            = std::make_shared< basic_mathematics::SphericalHarmonicsCache >( ) )
         : Base( positionOfBodySubjectToAccelerationFunction,
                 aGravitationalParameterFunction,
                 positionOfBodyExertingAccelerationFunction,
@@ -275,11 +282,16 @@ public:
           getSineHarmonicsCoefficients( sineHarmonicCoefficientsFunction ),
           rotationFromBodyFixedToIntegrationFrameFunction_( rotationFromBodyFixedToIntegrationFrameFunction ),
           sphericalHarmonicsCache_( sphericalHarmonicsCache ),
-          currentAcceleration_( Eigen::Vector3d::Zero( ) )
+          currentAcceleration_( Eigen::Vector3d::Zero( ) ),
+          saveSphericalHarmonicTermsSeparately_( false )
     {
+        maximumDegree_ = static_cast< int >( getCosineHarmonicsCoefficients( ).rows( ) );
+        maximumOrder_ = static_cast< int >( getCosineHarmonicsCoefficients( ).cols( ) );
         sphericalHarmonicsCache_->resetMaximumDegreeAndOrder(
-                    std::max< int >( static_cast< int >( getCosineHarmonicsCoefficients( ).rows( ) ), sphericalHarmonicsCache_->getMaximumDegree( ) ),
-                    std::max< int >( static_cast< int >( getCosineHarmonicsCoefficients( ).cols( ) ), sphericalHarmonicsCache_->getMaximumOrder( ) ) + 1 );
+                    std::max< int >( maximumDegree_,
+                                     sphericalHarmonicsCache_->getMaximumDegree( ) ),
+                    std::max< int >( maximumOrder_,
+                                     sphericalHarmonicsCache_->getMaximumOrder( ) ) + 1 );
 
 
         this->updateMembers( );
@@ -287,14 +299,23 @@ public:
 
     //! Get gravitational acceleration.
     /*!
-     * Returns the gravitational acceleration computed using the input parameters provided to the
-     * class. This function serves as a wrapper for the
-     * computeGeodesyNormalizedGravitationalAccelerationSum() function.
+     * Returns the gravitational acceleration computed by the updateMembers function.
      * \return Computed gravitational acceleration vector.
      */
     Eigen::Vector3d getAcceleration( )
     {
         return currentAcceleration_;
+    }
+
+    //! Get gravitational acceleration in body-fixed frame of body undergoing acceleration.
+    /*!
+     * Returns the gravitational acceleration in body-fixed frame of body undergoing acceleration computed
+     * computed by the updateMembers function.
+     * \return Computed gravitational acceleration vector.
+     */
+    Eigen::Vector3d getAccelerationInBodyFixedFrame( )
+    {
+        return currentAccelerationInBodyFixedFrame_;
     }
 
     //! Update class members.
@@ -307,29 +328,123 @@ public:
     {
         if( !( this->currentTime_ == currentTime ) )
         {
+
             cosineHarmonicCoefficients = getCosineHarmonicsCoefficients( );
             sineHarmonicCoefficients = getSineHarmonicsCoefficients( );
+
             rotationToIntegrationFrame_ = rotationFromBodyFixedToIntegrationFrameFunction_( );
             this->updateBaseMembers( );
-            currentAcceleration_ = rotationToIntegrationFrame_ *
+
+            currentInertialRelativePosition_ =
+                    this->positionOfBodySubjectToAcceleration - this->positionOfBodyExertingAcceleration ;
+
+            currentRelativePosition_ = rotationToIntegrationFrame_.inverse( ) * (
+                        currentInertialRelativePosition_ );
+
+            currentAcceleration_ =
                     computeGeodesyNormalizedGravitationalAccelerationSum(
-                        rotationToIntegrationFrame_.inverse( ) * (
-                            this->positionOfBodySubjectToAcceleration - this->positionOfBodyExertingAcceleration ),
+                        currentRelativePosition_,
                         gravitationalParameter,
                         equatorialRadius,
                         cosineHarmonicCoefficients,
-                        sineHarmonicCoefficients, sphericalHarmonicsCache_ );
+                        sineHarmonicCoefficients, sphericalHarmonicsCache_,
+                        accelerationPerTerm_,
+                        saveSphericalHarmonicTermsSeparately_,
+                        rotationToIntegrationFrame_.toRotationMatrix( ) );
+            currentAccelerationInBodyFixedFrame_ = rotationToIntegrationFrame_.inverse( ) * currentAcceleration_;
         }
     }
+
+    //! Function to retrieve total spherical harmonic acceleration in inertial frame, with alternative coefficients
+    /*!
+     * Function to retrieve total spherical harmonic acceleration in inertial frame, with alternative coefficients, e.g.
+     * different from those defined in this class
+     * \param cosineCoefficients Cosine coefficients to use
+     * \param sineCoefficients Sine coefficients to use
+     * \return Total spherical harmonic acceleration in inertial frame, with alternative coefficients
+     */
+    Eigen::VectorXd getAccelerationWithAlternativeCoefficients(
+            const Eigen::MatrixXd& cosineCoefficients, const Eigen::MatrixXd& sineCoefficients)
+    {
+        std::map< std::pair< int, int >, Eigen::Vector3d > dummy;
+        return computeGeodesyNormalizedGravitationalAccelerationSum(
+                    currentRelativePosition_,
+                    gravitationalParameter,
+                    equatorialRadius,
+                    cosineCoefficients,
+                    sineCoefficients, sphericalHarmonicsCache_,
+                    dummy,
+                    false,
+                    rotationToIntegrationFrame_.toRotationMatrix( ) );
+    }
+
+    //! Function to retrieve spherical harmonic acceleration in inertial frame, with alternative coefficients, per term
+    /*!
+     * Function to retrieve spherical harmonic acceleration in inertial frame, with alternative coefficients, per term.
+     * The acceleration is calculated separately for the contribution of each degree/order of the spherical harmonic field
+     * \param cosineCoefficients Cosine coefficients to use
+     * \param sineCoefficients Sine coefficients to use
+     * \param coefficientIndices Degrees and orders for which acceleration contributions are to be determined.
+     * \return Total spherical harmonic acceleration in inertial frame, with alternative coefficients
+     */
+    Eigen::VectorXd getAccelerationComponentsWithAlternativeCoefficients(
+            const Eigen::MatrixXd& cosineCoefficients, const Eigen::MatrixXd& sineCoefficients,
+            const std::vector< std::pair< int, int > >& coefficientIndices )
+    {
+        std::map< std::pair< int, int >, Eigen::Vector3d > accelerationPerTerm;
+
+        computeGeodesyNormalizedGravitationalAccelerationSum(
+                    currentRelativePosition_,
+                    gravitationalParameter,
+                    equatorialRadius,
+                    cosineCoefficients,
+                    sineCoefficients, sphericalHarmonicsCache_,
+                    accelerationPerTerm,
+                    true,
+                    rotationToIntegrationFrame_.toRotationMatrix( ) );
+
+
+        Eigen::VectorXd returnVector = Eigen::VectorXd( 3 * coefficientIndices.size( ) );
+        for( unsigned int i = 0; i < coefficientIndices.size( ); i++ )
+        {
+            returnVector.segment( i * 3, 3 ) = accelerationPerTerm.at( coefficientIndices.at( i ) );
+        }
+        return returnVector;
+   }
 
     //! Function to retrieve the spherical harmonics cache for this acceleration.
     /*!
      *  Function to retrieve the spherical harmonics cache for this acceleration.
      *  \return Spherical harmonics cache for this acceleration
      */
-    boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > getSphericalHarmonicsCache( )
+    std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > getSphericalHarmonicsCache( )
     {
         return sphericalHarmonicsCache_;
+    }
+
+    //! Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
+    //! fixed to body undergoing acceleration
+    /*!
+     * Function to return current position vector from body exerting acceleration to body undergoing acceleration, in frame
+     * fixed to bodyundergoing acceleration
+     * \return Current position vector from body exerting acceleration to body undergoing acceleration, in frame
+     * fixed to bodyundergoing acceleration
+     */
+    Eigen::Vector3d getCurrentRelativePosition( )
+    {
+        return currentRelativePosition_;
+    }
+
+    //! Function to return current position vector from body exerting acceleration to body undergoing acceleration, in inertial
+    //! frame
+    /*!
+     * Function to return current position vector from body exerting acceleration to body undergoing acceleration, in inertial
+     * frame
+     * \return Current position vector from body exerting acceleration to body undergoing acceleration, in inertial frame
+     */
+    Eigen::Vector3d getCurrentInertialRelativePosition( )
+    {
+        return currentInertialRelativePosition_;
     }
 
     //! Function to retrieve the spherical harmonics reference radius.
@@ -380,6 +495,61 @@ public:
         return rotationToIntegrationFrame_.toRotationMatrix( );
     }
 
+    //! Function to set whether each of the separate spherical harmonic terms should be saved
+    /*!
+     * Function to set whether each of the separate spherical harmonic terms should be saved (in accelerationPerTerm_ member
+     * variable of this class)
+     * \param saveSphericalHarmonicTermsSeparately Boolean denoting whether each of the separate spherical harmonic terms should
+     * be saved (in accelerationPerTerm_ member variable of this class
+     */
+    void setSaveSphericalHarmonicTermsSeparately( const bool saveSphericalHarmonicTermsSeparately )
+    {
+        saveSphericalHarmonicTermsSeparately_ = saveSphericalHarmonicTermsSeparately;
+    }
+
+    //! Function to retrieve the contributions of separate degrees/ordesr to the acceleration, concatenated in a single vector
+    /*!
+     * Function to retrieve the contributions of specific separate degree/order to the acceleration, concatenated in a single
+     * vector
+     * \param coefficientIndices List of degree/order at which the contributions to the full acceleration are to be retrieved
+     * \return Contributions of separate degrees/ordesr to the acceleration, concatenated in a single vector
+     */
+    Eigen::VectorXd getConcatenatedAccelerationComponents( const std::vector< std::pair< int, int > >& coefficientIndices )
+    {
+        if( !saveSphericalHarmonicTermsSeparately_ )
+        {
+            throw std::runtime_error( "Error when retrieving component accelerations from spherial harmonic acceleration, components not saved" );
+        }
+
+        Eigen::VectorXd returnVector = Eigen::VectorXd( 3 * coefficientIndices.size( ) );
+        for( unsigned int i = 0; i < coefficientIndices.size( ); i++ )
+        {
+            returnVector.segment( i * 3, 3 ) = accelerationPerTerm_.at( coefficientIndices.at( i ) );
+        }
+        return returnVector;
+    }
+
+    //! Function to retrieve maximum degree of gravity field expansion
+    /*!
+     * Function to retrieve maximum degree of gravity field expansion
+     * \return Maximum degree of gravity field expansion
+     */
+    int getMaximumDegree( )
+    {
+        return maximumDegree_;
+    }
+
+    //! Function to retrieve maximum order of gravity field expansion
+    /*!
+     * Function to retrieve maximum order of gravity field expansion
+     * \return Maximum order of gravity field expansion
+     */
+    int getMaximumOrder( )
+    {
+        return maximumOrder_;
+    }
+
+
 protected:
 
 private:
@@ -417,22 +587,44 @@ private:
     const CoefficientMatrixReturningFunction getSineHarmonicsCoefficients;
 
     //! Function returning the current rotation from body-fixed frame to integration frame.
-    boost::function< Eigen::Quaterniond( ) > rotationFromBodyFixedToIntegrationFrameFunction_;
+    std::function< Eigen::Quaterniond( ) > rotationFromBodyFixedToIntegrationFrameFunction_;
 
     //! Current rotation from body-fixed frame to integration frame.
     Eigen::Quaterniond rotationToIntegrationFrame_;
 
-    //!  Spherical harmonics cache for this acceleration
-    boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache_;
+    //! Current position vector from body exerting acceleration to body undergoing acceleration, in frame fixed to body
+    //! undergoing acceleration
+    Eigen::Vector3d currentRelativePosition_;
 
-    //! Current acceleration, as computed by last call to updateMembers function
+    //! Current position vector from body exerting acceleration to body undergoing acceleration, in inertial frame
+    Eigen::Vector3d currentInertialRelativePosition_;
+
+    //!  Spherical harmonics cache for this acceleration
+    std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache_;
+
+    //! Current acceleration in inertial frame, as computed by last call to updateMembers function
     Eigen::Vector3d currentAcceleration_;
+
+    //! Current acceleration in frame fixed to body undergoing acceleration, as computed by last call to updateMembers function
+    Eigen::Vector3d currentAccelerationInBodyFixedFrame_;
+
+    //! List of contributions to accelerations at given degrees/orders, represented by first/second entry of map key pair.
+    std::map< std::pair< int, int >, Eigen::Vector3d > accelerationPerTerm_;
+
+    //! Boolean that denotes whether each of the separate spherical harmonic terms should be saved (in accelerationPerTerm_)
+    bool saveSphericalHarmonicTermsSeparately_;
+
+    //! Maximum degree of gravity field expansion
+    int maximumDegree_;
+
+    //! Maximum order of gravity field expansion
+    int maximumOrder_;
 
 };
 
 
 //! Typedef for shared-pointer to SphericalHarmonicsGravitationalAccelerationModel.
-typedef boost::shared_ptr< SphericalHarmonicsGravitationalAccelerationModel >
+typedef std::shared_ptr< SphericalHarmonicsGravitationalAccelerationModel >
 SphericalHarmonicsGravitationalAccelerationModelPointer;
 
 

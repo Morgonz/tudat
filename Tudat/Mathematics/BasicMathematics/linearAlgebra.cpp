@@ -26,15 +26,43 @@ namespace linear_algebra
 Eigen::Vector4d convertQuaternionToVectorFormat( const Eigen::Quaterniond& quaternion )
 {
     Eigen::Vector4d vector;
-
     vector( 0 ) = quaternion.w( );
     vector( 1 ) = quaternion.x( );
     vector( 2 ) = quaternion.y( );
     vector( 3 ) = quaternion.z( );
-
     return vector;
 }
 
+//! Function to put a vector in 'quaternion format', i.e. a Quaterniond.
+Eigen::Quaterniond convertVectorToQuaternionFormat( const Eigen::Vector4d& vector )
+{
+    Eigen::Quaterniond quaternion;
+    quaternion.w( ) = vector( 0 );
+    quaternion.x( ) = vector( 1 );
+    quaternion.y( ) = vector( 2 );
+    quaternion.z( ) = vector( 3 );
+
+    return quaternion;
+}
+
+
+//! Function to take the product of two quaternions.
+Eigen::Vector4d quaternionProduct( const Eigen::Vector4d& firstQuaternion, const Eigen::Vector4d& secondQuaternion )
+{
+    Eigen::Vector4d resultantQuaternion;
+    resultantQuaternion[ 0 ] = firstQuaternion[ 0 ] * secondQuaternion[ 0 ] -
+            firstQuaternion.segment( 1, 3 ).dot( secondQuaternion.segment( 1, 3 ) );
+    resultantQuaternion.segment( 1, 3 ) = firstQuaternion[ 0 ] * secondQuaternion.segment( 1, 3 ) +
+            secondQuaternion[ 0 ] * firstQuaternion.segment( 1, 3 ) +
+            getCrossProductMatrix( firstQuaternion.segment( 1, 3 ) ) * secondQuaternion.segment( 1, 3 );
+    return resultantQuaternion;
+}
+
+//! Function to invert a quaternion.
+void invertQuaternion( Eigen::Vector4d& quaternionVector )
+{
+    quaternionVector.segment( 1, 3 ) *= -1.0;
+}
 
 //! Function that returns that 'cross-product matrix'
 Eigen::Matrix3d getCrossProductMatrix( const Eigen::Vector3d& vector )
@@ -102,14 +130,14 @@ double getVectorNorm( const Eigen::Vector3d& vector )
 }
 
 Eigen::Vector3d evaluateSecondBlockInStateVector(
-        const boost::function< Eigen::Vector6d( const double ) > stateFunction,
+        const std::function< Eigen::Vector6d( const double ) > stateFunction,
         const double time )
 {
     return stateFunction( time ).segment( 3, 3 );
 }
 
 //! Computes the norm of a 3d vector from a vector-returning function.
-double getVectorNormFromFunction( const boost::function< Eigen::Vector3d( ) > vectorFunction )
+double getVectorNormFromFunction( const std::function< Eigen::Vector3d( ) > vectorFunction )
 {
     return getVectorNorm( vectorFunction( ) );
 }
@@ -136,6 +164,33 @@ double getVectorEntryRootMeanSquare( const Eigen::VectorXd& inputVector )
     vectorRms = std::sqrt( vectorRms / inputVector.rows( ) );
 
     return vectorRms;
+}
+
+//! Function to compute the partial derivative of a rotation matrix w.r.t. its associated quaterion elements
+void computePartialDerivativeOfRotationMatrixWrtQuaternion(
+        const Eigen::Vector4d quaternionVector,
+        std::vector< Eigen::Matrix3d >& partialDerivatives )
+{
+    partialDerivatives[ 0 ]<< quaternionVector( 0 ), -quaternionVector( 3 ), quaternionVector( 2 ),
+            quaternionVector( 3 ), quaternionVector( 0 ), -quaternionVector( 1 ),
+            -quaternionVector( 2 ), quaternionVector( 1 ), quaternionVector( 0 );
+     partialDerivatives[ 0 ] *= 2.0;
+
+    partialDerivatives[ 1 ]<< quaternionVector( 1 ), quaternionVector( 2 ), quaternionVector( 3 ),
+            quaternionVector( 2 ), -quaternionVector( 1 ), -quaternionVector( 0 ),
+            quaternionVector( 3 ), quaternionVector( 0 ), -quaternionVector( 1 );
+    partialDerivatives[ 1 ] *= 2.0;
+
+    partialDerivatives[ 2 ]<< -quaternionVector( 2 ), quaternionVector( 1 ), quaternionVector( 0 ),
+            quaternionVector( 1 ), quaternionVector( 2 ), quaternionVector( 3 ),
+            -quaternionVector( 0 ), quaternionVector( 3 ), -quaternionVector( 2 );
+    partialDerivatives[ 2 ] *= 2.0;
+
+    partialDerivatives[ 3 ]<< -quaternionVector( 3 ), -quaternionVector( 0 ), quaternionVector( 1 ),
+            quaternionVector( 0 ), -quaternionVector( 3 ), quaternionVector( 2 ),
+            quaternionVector( 1 ), quaternionVector( 2 ), quaternionVector( 3 );
+    partialDerivatives[ 3 ] *= 2.0;
+
 }
 
 

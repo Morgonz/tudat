@@ -63,7 +63,7 @@ public:
      */
     NBodyGaussModifiedEquinictialStateDerivative(
             const basic_astrodynamics::AccelerationMap& accelerationModelsPerBody,
-            const boost::shared_ptr< CentralBodyData< StateScalarType, TimeType > > centralBodyData,
+            const std::shared_ptr< CentralBodyData< StateScalarType, TimeType > > centralBodyData,
             const std::vector< std::string >& bodiesToIntegrate ,
             const std::vector< Eigen::Matrix< StateScalarType, 6, 1 > >& initialKeplerElements ):
         NBodyStateDerivative< StateScalarType, TimeType >(
@@ -127,13 +127,12 @@ public:
         stateDerivative.setZero( );
         this->sumStateDerivativeContributions( stateOfSystemToBeIntegrated, stateDerivative, false );
 
-
         // Compute RSW accelerations for each body, and evaluate MEE Gauss equations.
         Eigen::Vector3d currentAccelerationInRswFrame;
         for( unsigned int i = 0; i < this->bodiesToBeIntegratedNumerically_.size( ); i++ )
         {
-            currentAccelerationInRswFrame = reference_frames::getInertialToRswSatelliteCenteredFrameRotationMatrx(
-                        currentCartesianLocalSoluton_.segment( i * 6, 6 ).template cast< double >( ) ) *
+            currentAccelerationInRswFrame = reference_frames::getInertialToRswSatelliteCenteredFrameRotationMatrix(
+                        currentCartesianLocalSolution_.segment( i * 6, 6 ).template cast< double >( ) ) *
                     stateDerivative.block( i * 6 + 3, 0, 3, 1 ).template cast< double >( );
 
             stateDerivative.block( i * 6, 0, 6, 1 ) = computeGaussPlanetaryEquationsForModifiedEquinoctialElements(
@@ -181,23 +180,23 @@ public:
      * \param internalSolution State in Modified Equinoctial Elemements (i.e. form that is used in
      * numerical integration)
      * \param time Current time at which the state is valid
-     * \param currentCartesianLocalSoluton State (internalSolution, which is Encke-formulation),
+     * \param currentCartesianLocalSolution State (internalSolution, which is Encke-formulation),
      *  converted to the 'conventional form' (returned by reference).
      */
     void convertToOutputSolution(
             const Eigen::Matrix< StateScalarType, Eigen::Dynamic, Eigen::Dynamic >& internalSolution, const TimeType& time,
-            Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSoluton )
+            Eigen::Block< Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > > currentCartesianLocalSolution )
     {
         // Convert state to Cartesian for each body
         for( unsigned int i = 0; i < this->bodiesToBeIntegratedNumerically_.size( ); i++ )
         {
-            currentCartesianLocalSoluton.segment( i * 6, 6 ) =
+            currentCartesianLocalSolution.segment( i * 6, 6 ) =
                     orbital_element_conversions::convertModifiedEquinoctialToCartesianElements< StateScalarType >(
                         internalSolution.block( i * 6, 0, 6, 1 ), static_cast< StateScalarType >(
                             centralBodyGravitationalParameters_.at( i )( ) ), flipSingularities_.at( i ) );
         }
 
-        currentCartesianLocalSoluton_ = currentCartesianLocalSoluton;
+        currentCartesianLocalSolution_ = currentCartesianLocalSolution;
     }
 
     //! Function to get the acceleration models
@@ -214,21 +213,21 @@ public:
 private:
 
     //!  Gravitational parameters of central bodies used to convert Cartesian to Keplerian orbits, and vice versa
-    std::vector< boost::function< double( ) > > centralBodyGravitationalParameters_;
+    std::vector< std::function< double( ) > > centralBodyGravitationalParameters_;
 
     //! Central body accelerations for each propagated body, which has been removed from accelerationModelsPerBody_
-    std::vector< boost::shared_ptr< basic_astrodynamics::AccelerationModel< Eigen::Vector3d > > >
+    std::vector< std::shared_ptr< basic_astrodynamics::AccelerationModel< Eigen::Vector3d > > >
     centralAccelerations_;
 
     //! List of acceleration models, including the central body accelerations thta are removed in this propagation scheme.
     basic_astrodynamics::AccelerationMap originalAccelerationModelsPerBody_;
 
-    //! Current full Cartesian state of the propagated bodies, w.r.t. trhe central bodies
+    //! Current full Cartesian state of the propagated bodies, w.r.t. the central bodies
     /*!
-     *  Current full Cartesian state of the propagated bodies, w.r.t. trhe central bodies. These variables are set when calling
+     *  Current full Cartesian state of the propagated bodies, w.r.t. the central bodies. These variables are set when calling
      *  the convertToOutputSolution function.
      */
-    Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > currentCartesianLocalSoluton_;
+    Eigen::Matrix< StateScalarType, Eigen::Dynamic, 1 > currentCartesianLocalSolution_;
 
     //! List of booleans to denote, per propagated body, if the singularity in the MEE equations it o be flipped to 0 inclination
     //! (if true) or if it remains at 180 degree inclination (if false)
@@ -236,6 +235,13 @@ private:
 
 };
 
+extern template class NBodyGaussModifiedEquinictialStateDerivative< double, double >;
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+extern template class NBodyGaussModifiedEquinictialStateDerivative< long double, double >;
+extern template class NBodyGaussModifiedEquinictialStateDerivative< double, Time >;
+extern template class NBodyGaussModifiedEquinictialStateDerivative< long double, Time >;
+#endif
 
 } // namespace propagators
 

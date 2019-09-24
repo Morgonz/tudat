@@ -16,13 +16,13 @@
 #include <map>
 #include <vector>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
 #include "Tudat/Mathematics/Interpolators/lookupScheme.h"
-#include "Tudat/Mathematics/Interpolators/linearInterpolator.h"
-
+#include "Tudat/Mathematics/Interpolators/createInterpolator.h"
+#include "Tudat/Basics/timeType.h"
 #include "Tudat/Astrodynamics/Ephemerides/rotationalEphemeris.h"
 
 namespace tudat
@@ -58,11 +58,12 @@ public:
      * \param targetFrameOrientation Target frame identifier.
      */
     TabulatedRotationalEphemeris(
-            const boost::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > >
+            const std::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > >
             interpolator,
             const std::string& baseFrameOrientation = "ECLIPJ2000",
             const std::string& targetFrameOrientation = "" ):
-        RotationalEphemeris( baseFrameOrientation, targetFrameOrientation ), interpolator_( interpolator ){  }
+        RotationalEphemeris( baseFrameOrientation, targetFrameOrientation ), interpolator_( interpolator ),
+    currentTime_( TUDAT_NAN ){  }
 
     //! Destructor
     ~TabulatedRotationalEphemeris( ){ }
@@ -76,7 +77,7 @@ public:
      *  frame, and body's angular velocity vector, expressed in its body-fixed frame (target frame).The quaternion is normalized
      *  to 1 before being set as the current rotation. Other properties of the rotation are derived from these two quantities.
      */
-    void reset( const boost::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > > interpolator )
+    void reset( const std::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > > interpolator )
     {
         interpolator_ = interpolator;
     }
@@ -88,7 +89,7 @@ public:
      *  The interpolated data must consist of the four entries (w,x,y,z) of the quaternion from the target frame to the base
      *  frame, and body's angular velocity vector, expressed in its body-fixed frame (target frame).
      */
-    boost::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > > getInterpolator( )
+    std::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > > getInterpolator( )
     {
         return interpolator_;
     }
@@ -180,7 +181,7 @@ private:
      */
     void updateInterpolator( const double time )
     {
-        if( ! ( time == currentTime_ ) )
+        if( !( time == currentTime_ ) )
         {
             // Retrieve data from interpolator
             currentRotationalState_ = interpolator_->interpolate( time );
@@ -206,7 +207,7 @@ private:
      * The interpolated data must consist of the four entries (w,x,y,z) of the quaternion from the target frame to the base
      * frame, and body's angular velocity vector, expressed in its body-fixed frame (target frame).
      */
-    boost::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > > interpolator_;
+    std::shared_ptr< interpolators::OneDimensionalInterpolator< TimeType, StateType > > interpolator_;
 
     //! Last time at which the updateInterpolator function was called
     double currentTime_;
@@ -221,6 +222,52 @@ private:
     Eigen::Quaternion< StateScalarType > currentRotationToBaseFrame_;
 
 };
+
+//! Create a tabulated rotation model from a given rotation model and interpolation settings
+/*!
+ * Create a tabulated rotation model from a given rotation model and interpolation settings
+ * \param ephemerisToInterrogate Rotation model from which the tabulated model is tpo be synthesized
+ * \param startTime Start time for tabulated model
+ * \param endTime End time for tabulated model
+ * \param timeStep Constant time step for tabulated model
+ * \param interpolatorSettings Interpolation settings for tabulated model
+ * \return Tabulated rotation model, as synthesized from a given rotation model and interpolation settings
+ */
+template< typename StateScalarType = double, typename TimeType = double >
+std::shared_ptr< RotationalEphemeris > getTabulatedRotationalEphemeris(
+        const std::shared_ptr< RotationalEphemeris > ephemerisToInterrogate,
+        const TimeType startTime,
+        const TimeType endTime,
+        const TimeType timeStep,
+        const std::shared_ptr< interpolators::InterpolatorSettings > interpolatorSettings =
+        std::make_shared< interpolators::LagrangeInterpolatorSettings >( 8 ) )
+{
+    typedef Eigen::Matrix< StateScalarType, 7, 1 > StateType;
+
+    // Create state map that is to be interpolated
+    std::map< TimeType, StateType >  stateMap;
+    TimeType currentTime = startTime;
+    while( currentTime <= endTime )
+    {
+        stateMap[ currentTime ] = ephemerisToInterrogate->getRotationStateVector( currentTime );
+        currentTime += timeStep;
+    }
+
+    // Create tabulated ephemeris model
+    return std::make_shared< TabulatedRotationalEphemeris< StateScalarType, TimeType > >(
+                interpolators::createOneDimensionalInterpolator( stateMap, interpolatorSettings ),
+                ephemerisToInterrogate->getBaseFrameOrientation( ),
+                ephemerisToInterrogate->getTargetFrameOrientation( ) );
+
+}
+
+extern template class TabulatedRotationalEphemeris< double, double >;
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+extern template class TabulatedRotationalEphemeris< long double, double >;
+extern template class TabulatedRotationalEphemeris< double, Time >;
+extern template class TabulatedRotationalEphemeris< long double, Time >;
+#endif
 
 }
 

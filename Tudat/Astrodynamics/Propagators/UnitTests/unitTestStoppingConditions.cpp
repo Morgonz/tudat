@@ -13,7 +13,7 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "Tudat/Astrodynamics/Aerodynamics/UnitTests/testApolloCapsuleCoefficients.h"
 #include "Tudat/Astrodynamics/BasicAstrodynamics/accelerationModel.h"
@@ -21,7 +21,7 @@
 #include "Tudat/Astrodynamics/BasicAstrodynamics/unitConversions.h"
 #include "Tudat/External/SpiceInterface/spiceInterface.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/body.h"
-#include "Tudat/SimulationSetup/PropagationSetup/createNumericalSimulator.h"
+#include "Tudat/SimulationSetup/EstimationSetup/createNumericalSimulator.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/defaultBodies.h"
 #include "Tudat/InputOutput/basicInputOutput.h"
 #include <limits>
@@ -37,58 +37,58 @@ namespace unit_tests
 
 BOOST_AUTO_TEST_SUITE( test_propagation_stopping_conditions )
 
-boost::shared_ptr< propagators::PropagationTerminationSettings > getTerminationSettings( const int testType )
+std::shared_ptr< propagators::PropagationTerminationSettings > getTerminationSettings( const int testType )
 {
 
     // Define stopping conditions, depending on test case.
-    boost::shared_ptr< propagators::PropagationTerminationSettings > terminationSettings;
+    std::shared_ptr< propagators::PropagationTerminationSettings > terminationSettings;
     switch( testType )
     {
     // Stop at given time.
     case 0:
-        terminationSettings = boost::make_shared< propagators::PropagationTimeTerminationSettings >( 3200.0 );
+        terminationSettings = std::make_shared< propagators::PropagationTimeTerminationSettings >( 3200.0 );
         break;
-    // Stop at given Mach number
+        // Stop at given Mach number
     case 1:
-        terminationSettings = boost::make_shared< propagators::PropagationDependentVariableTerminationSettings >(
-                    boost::make_shared< propagators::SingleDependentVariableSaveSettings >(
+        terminationSettings = std::make_shared< propagators::PropagationDependentVariableTerminationSettings >(
+                    std::make_shared< propagators::SingleDependentVariableSaveSettings >(
                         propagators::mach_number_dependent_variable, "Apollo" ), 3.0, 1 );
         break;
-    // Stop at given altitude
+        // Stop at given altitude
     case 2:
-        terminationSettings = boost::make_shared< propagators::PropagationDependentVariableTerminationSettings >(
-                    boost::make_shared< propagators::SingleDependentVariableSaveSettings >(
+        terminationSettings = std::make_shared< propagators::PropagationDependentVariableTerminationSettings >(
+                    std::make_shared< propagators::SingleDependentVariableSaveSettings >(
                         propagators::altitude_dependent_variable, "Apollo" ), 10.0E3, 1 );
         break;
-    // Stop at given density
+        // Stop at given density
     case 3:
-        terminationSettings = boost::make_shared< propagators::PropagationDependentVariableTerminationSettings >(
-                    boost::make_shared< propagators::SingleDependentVariableSaveSettings >(
+        terminationSettings = std::make_shared< propagators::PropagationDependentVariableTerminationSettings >(
+                    std::make_shared< propagators::SingleDependentVariableSaveSettings >(
                         propagators::local_density_dependent_variable, "Apollo" ), 1.1, 0);
         break;
-    // Stop when a single of the conditions 0-3 is fulfilled.
+        // Stop when a single of the conditions 0-3 is fulfilled.
     case 4:
     {
-        std::vector< boost::shared_ptr< propagators::PropagationTerminationSettings > > constituentSettings;
+        std::vector< std::shared_ptr< propagators::PropagationTerminationSettings > > constituentSettings;
         constituentSettings.push_back( getTerminationSettings( 0 ) );
         constituentSettings.push_back( getTerminationSettings( 1 ) );
         constituentSettings.push_back( getTerminationSettings( 2 ) );
         constituentSettings.push_back( getTerminationSettings( 3 ) );
 
-        terminationSettings = boost::make_shared< propagators::PropagationHybridTerminationSettings >(
+        terminationSettings = std::make_shared< propagators::PropagationHybridTerminationSettings >(
                     constituentSettings, 1 );
         break;
     }
-    // Stop when all of the conditions 0-3 is fulfilled.
+        // Stop when all of the conditions 0-3 is fulfilled.
     case 5:
     {
-        std::vector< boost::shared_ptr< propagators::PropagationTerminationSettings > > constituentSettings;
+        std::vector< std::shared_ptr< propagators::PropagationTerminationSettings > > constituentSettings;
         constituentSettings.push_back( getTerminationSettings( 0 ) );
         constituentSettings.push_back( getTerminationSettings( 1 ) );
         constituentSettings.push_back( getTerminationSettings( 2 ) );
         constituentSettings.push_back( getTerminationSettings( 3 ) );
 
-        terminationSettings = boost::make_shared< propagators::PropagationHybridTerminationSettings >(
+        terminationSettings = std::make_shared< propagators::PropagationHybridTerminationSettings >(
                     constituentSettings, 0 );
         break;
     }
@@ -141,13 +141,13 @@ void performSimulation( const int testType )
 
 
     // Define simulation body settings.
-    std::map< std::string, boost::shared_ptr< BodySettings > > bodySettings =
+    std::map< std::string, std::shared_ptr< BodySettings > > bodySettings =
             getDefaultBodySettings( { "Earth" }, simulationStartEpoch - 10.0 * fixedStepSize,
                                     simulationEndEpoch + 10.0 * fixedStepSize );
-    bodySettings[ "Earth" ]->ephemerisSettings = boost::make_shared< simulation_setup::ConstantEphemerisSettings >(
+    bodySettings[ "Earth" ]->ephemerisSettings = std::make_shared< simulation_setup::ConstantEphemerisSettings >(
                 Eigen::Vector6d::Zero( ), "SSB", "J2000" );
     bodySettings[ "Earth" ]->gravityFieldSettings =
-            boost::make_shared< simulation_setup::GravityFieldSettings >(
+            std::make_shared< simulation_setup::GravityFieldSettings >(
                 central_spice );
     bodySettings[ "Earth" ]->rotationModelSettings->resetOriginalFrame( "J2000" );
 
@@ -160,7 +160,7 @@ void performSimulation( const int testType )
     std::vector< std::string > centralBodies;
 
     // Create vehicle objects.
-    bodyMap[ "Apollo" ] = boost::make_shared< simulation_setup::Body >( );
+    bodyMap[ "Apollo" ] = std::make_shared< simulation_setup::Body >( );
 
     // Create vehicle aerodynamic coefficients
     bodyMap[ "Apollo" ]->setAerodynamicCoefficientInterface(
@@ -171,10 +171,10 @@ void performSimulation( const int testType )
     setGlobalFrameBodyEphemerides( bodyMap, "SSB", "J2000" );
 
     // Define acceleration model settings.
-    std::map< std::string, std::vector< boost::shared_ptr< AccelerationSettings > > > accelerationsOfApollo;
-    accelerationsOfApollo[ "Earth" ].push_back( boost::make_shared< AccelerationSettings >( central_gravity ) );
-    accelerationsOfApollo[ "Earth" ].push_back( boost::make_shared< AccelerationSettings >( aerodynamic ) );
-    accelerationMap[  "Apollo" ] = accelerationsOfApollo;
+    std::map< std::string, std::vector< std::shared_ptr< AccelerationSettings > > > accelerationsOfApollo;
+    accelerationsOfApollo[ "Earth" ].push_back( std::make_shared< AccelerationSettings >( central_gravity ) );
+    accelerationsOfApollo[ "Earth" ].push_back( std::make_shared< AccelerationSettings >( aerodynamic ) );
+    accelerationMap[ "Apollo" ] = accelerationsOfApollo;
 
     bodiesToPropagate.push_back( "Apollo" );
     centralBodies.push_back( "Earth" );
@@ -185,12 +185,12 @@ void performSimulation( const int testType )
     // Create acceleration models and propagation settings, using current test case to retrieve stop settings..
     basic_astrodynamics::AccelerationMap accelerationModelMap = createAccelerationModelsMap(
                 bodyMap, accelerationMap, bodiesToPropagate, centralBodies );
-    boost::shared_ptr< TranslationalStatePropagatorSettings< double > > propagatorSettings =
-            boost::make_shared< TranslationalStatePropagatorSettings< double > >
+    std::shared_ptr< TranslationalStatePropagatorSettings< double > > propagatorSettings =
+            std::make_shared< TranslationalStatePropagatorSettings< double > >
             ( centralBodies, accelerationModelMap, bodiesToPropagate, systemInitialState,
               getTerminationSettings( testType ) );
-    boost::shared_ptr< IntegratorSettings< > > integratorSettings =
-            boost::make_shared< IntegratorSettings< > >
+    std::shared_ptr< IntegratorSettings< > > integratorSettings =
+            std::make_shared< IntegratorSettings< > >
             ( rungeKutta4, simulationStartEpoch, fixedStepSize );
 
     // Create simulation object and propagate dynamics.
@@ -214,11 +214,12 @@ void performSimulation( const int testType )
     case 1:
     {
         // Compute Mach number for last two time steps, and check whether last step was first to pass below Mach=3
-        boost::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
+        std::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
                 dynamicsSimulator.getDynamicsStateDerivative( );
         stateDerivativeModel->computeStateDerivative(
                     (--(--( numericalSolution.end( ) ) ) )->first, (--(--( numericalSolution.end( ) ) ) )->second );
-        boost::shared_ptr< FlightConditions > flightConditions = bodyMap.at( "Apollo" )->getFlightConditions( );
+        std::shared_ptr< AtmosphericFlightConditions > flightConditions =
+                std::dynamic_pointer_cast< AtmosphericFlightConditions >( bodyMap.at( "Apollo" )->getFlightConditions( ) );
         double secondToLastMachNumber = flightConditions->getCurrentAirspeed( ) / flightConditions->getCurrentSpeedOfSound( );
         stateDerivativeModel->computeStateDerivative(
                     (--( numericalSolution.end( ) ) )->first, (--( numericalSolution.end( ) ) )->second );
@@ -231,11 +232,11 @@ void performSimulation( const int testType )
     case 2:
     {
         // Compute altitude for last two time steps, and check whether last step was first to pass below altitude = 10 km
-        boost::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
+        std::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
                 dynamicsSimulator.getDynamicsStateDerivative( );
         stateDerivativeModel->computeStateDerivative(
                     (--(--( numericalSolution.end( ) ) ) )->first, (--(--( numericalSolution.end( ) ) ) )->second );
-        boost::shared_ptr< FlightConditions > flightConditions = bodyMap.at( "Apollo" )->getFlightConditions( );
+        std::shared_ptr< FlightConditions > flightConditions = bodyMap.at( "Apollo" )->getFlightConditions( );
         double secondToLastAltitude = flightConditions->getCurrentAltitude( );
         stateDerivativeModel->computeStateDerivative(
                     (--( numericalSolution.end( ) ) )->first, (--( numericalSolution.end( ) ) )->second );
@@ -248,11 +249,12 @@ void performSimulation( const int testType )
     case 3:
     {
         // Compute density for last two time steps, and check whether last step was first to pass below density = 1.1 kg/m3
-        boost::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
+        std::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
                 dynamicsSimulator.getDynamicsStateDerivative( );
         stateDerivativeModel->computeStateDerivative(
                     (--(--( numericalSolution.end( ) ) ) )->first, (--(--( numericalSolution.end( ) ) ) )->second );
-        boost::shared_ptr< FlightConditions > flightConditions = bodyMap.at( "Apollo" )->getFlightConditions( );
+        std::shared_ptr< AtmosphericFlightConditions > flightConditions =
+                std::dynamic_pointer_cast< AtmosphericFlightConditions >( bodyMap.at( "Apollo" )->getFlightConditions( ) );
         double secondToLastDensity = flightConditions->getCurrentDensity( );
         stateDerivativeModel->computeStateDerivative(
                     (--( numericalSolution.end( ) ) )->first, (--( numericalSolution.end( ) ) )->second );
@@ -262,14 +264,15 @@ void performSimulation( const int testType )
 
         break;
     }
-    // Check whether at least a single of the conditions for case 0-3 was first reached at last time step.
+        // Check whether at least a single of the conditions for case 0-3 was first reached at last time step.
     case 4:
     {
-        boost::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
+        std::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
                 dynamicsSimulator.getDynamicsStateDerivative( );
         stateDerivativeModel->computeStateDerivative(
                     (--(--( numericalSolution.end( ) ) ) )->first, (--(--( numericalSolution.end( ) ) ) )->second );
-        boost::shared_ptr< FlightConditions > flightConditions = bodyMap.at( "Apollo" )->getFlightConditions( );
+        std::shared_ptr< AtmosphericFlightConditions > flightConditions =
+                std::dynamic_pointer_cast< AtmosphericFlightConditions >( bodyMap.at( "Apollo" )->getFlightConditions( ) );
 
         double secondToLastMachNumber = flightConditions->getCurrentAirspeed( ) / flightConditions->getCurrentSpeedOfSound( );
         double secondToLastAltitude = flightConditions->getCurrentAltitude( );
@@ -292,11 +295,12 @@ void performSimulation( const int testType )
         // Check whether all conditions for case 0-3 was first reached at last time step.
     case 5:
     {
-        boost::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
+        std::shared_ptr< DynamicsStateDerivativeModel< double, double > > stateDerivativeModel =
                 dynamicsSimulator.getDynamicsStateDerivative( );
         stateDerivativeModel->computeStateDerivative(
                     (--(--( numericalSolution.end( ) ) ) )->first, (--(--( numericalSolution.end( ) ) ) )->second );
-        boost::shared_ptr< FlightConditions > flightConditions = bodyMap.at( "Apollo" )->getFlightConditions( );
+        std::shared_ptr< AtmosphericFlightConditions > flightConditions =
+                std::dynamic_pointer_cast< AtmosphericFlightConditions >( bodyMap.at( "Apollo" )->getFlightConditions( ) );
 
         double secondToLastMachNumber = flightConditions->getCurrentAirspeed( ) / flightConditions->getCurrentSpeedOfSound( );
         double secondToLastAltitude = flightConditions->getCurrentAltitude( );
@@ -334,6 +338,100 @@ BOOST_AUTO_TEST_CASE( testPropagationStoppingConditions )
         performSimulation( i );
     }
 }
+
+//! Test to see if environment is updated to evaluate stopping conditions if required
+//! (test uses altitude above Earth for Kepler orbit dynamics)
+BOOST_AUTO_TEST_CASE( testPropagationStoppingConditionsWithDependentVariableUpdate )
+{
+    using namespace tudat;
+    using namespace tudat::simulation_setup;
+    using namespace tudat::propagators;
+    using namespace tudat::numerical_integrators;
+    using namespace tudat::orbital_element_conversions;
+    using namespace tudat::basic_mathematics;
+    using namespace tudat::unit_conversions;
+
+    spice_interface::loadStandardSpiceKernels( );
+
+    // Create body objects.
+    std::vector< std::string > bodiesToCreate;
+    bodiesToCreate.push_back( "Earth" );
+    std::map< std::string, std::shared_ptr< BodySettings > > bodySettings =
+            getDefaultBodySettings( bodiesToCreate );
+    bodySettings[ "Earth" ]->ephemerisSettings = std::make_shared< ConstantEphemerisSettings >(
+                Eigen::Vector6d::Zero( ) );
+
+    // Create bodies
+    NamedBodyMap bodyMap = createBodies( bodySettings );
+    bodyMap[ "Asterix" ] = std::make_shared< simulation_setup::Body >( );
+    setGlobalFrameBodyEphemerides( bodyMap, "SSB", "ECLIPJ2000" );
+
+    // Define propagator settings variables.
+    SelectedAccelerationMap accelerationMap;
+    std::vector< std::string > bodiesToPropagate;
+    std::vector< std::string > centralBodies;
+    bodiesToPropagate.push_back( "Asterix" );
+    centralBodies.push_back( "Earth" );
+
+    // Define propagation settings.
+    std::map< std::string, std::vector< std::shared_ptr< AccelerationSettings > > > accelerationsOfAsterix;
+    accelerationsOfAsterix[ "Earth" ].push_back( std::make_shared< AccelerationSettings >(
+                                                     basic_astrodynamics::central_gravity ) );
+    accelerationMap[ "Asterix" ] = accelerationsOfAsterix;
+
+    // Create acceleration models and propagation settings.
+    basic_astrodynamics::AccelerationMap accelerationModelMap = createAccelerationModelsMap(
+                bodyMap, accelerationMap, bodiesToPropagate, centralBodies );
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////             CREATE PROPAGATION SETTINGS            ////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Set initial conditions for the Asterix satellite that will be propagated in this simulation.
+    // The initial conditions are given in Keplerian elements and later on converted to Cartesian
+    // elements.
+
+    // Set Keplerian elements for Asterix.
+    Eigen::Vector6d asterixInitialStateInKeplerianElements =Eigen::Vector6d::Zero( );
+    asterixInitialStateInKeplerianElements( semiMajorAxisIndex ) = 7000.0E3;
+    asterixInitialStateInKeplerianElements( eccentricityIndex ) = 0.5;
+    asterixInitialStateInKeplerianElements( trueAnomalyIndex ) = convertDegreesToRadians( 180.0 );
+
+    // Convert Asterix state from Keplerian elements to Cartesian elements.
+    double earthGravitationalParameter = bodyMap.at( "Earth" )->getGravityFieldModel( )->getGravitationalParameter( );
+    Eigen::VectorXd systemInitialState = convertKeplerianToCartesianElements( asterixInitialStateInKeplerianElements,
+                earthGravitationalParameter );
+
+    // Define termination conditions
+    std::shared_ptr< PropagationTerminationSettings > stoppingCondition =
+            std::make_shared< PropagationDependentVariableTerminationSettings >(
+                std::make_shared< propagators::SingleDependentVariableSaveSettings >(
+                propagators::altitude_dependent_variable, "Asterix", "Earth" ), 25.0E3, 1 );
+
+    // Create simulation object and propagate dynamics.
+    std::shared_ptr< TranslationalStatePropagatorSettings< double > > propagatorSettings =
+            std::make_shared< TranslationalStatePropagatorSettings< double > >
+            ( centralBodies, accelerationModelMap, bodiesToPropagate, systemInitialState, stoppingCondition );
+    std::shared_ptr< IntegratorSettings< > > integratorSettings =
+            std::make_shared< IntegratorSettings< > >
+            ( rungeKutta4, 0.0, 10.0 );
+    SingleArcDynamicsSimulator< > dynamicsSimulator(
+                bodyMap, integratorSettings, propagatorSettings );
+    std::map< double, Eigen::VectorXd > integrationResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( );
+
+
+    // Check whether termination done correctly
+    auto stateIterator = integrationResult.rbegin( );
+    BOOST_CHECK_EQUAL(
+               ( stateIterator->second.segment( 0, 3 ).norm( ) -
+                 tudat::spice_interface::getAverageRadius( "Earth" ) ) < 25.0E3, true );
+    stateIterator++;
+    BOOST_CHECK_EQUAL(
+               ( stateIterator->second.segment( 0, 3 ).norm( ) -
+                 tudat::spice_interface::getAverageRadius( "Earth" ) ) < 25.0E3, false );
+}
+
 
 
 BOOST_AUTO_TEST_SUITE_END( )

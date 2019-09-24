@@ -104,7 +104,7 @@ void computePotentialSphericalHessian(
         const int order,
         const double cosineHarmonicCoefficient,
         const double sineHarmonicCoefficient,
-        const boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
+        const std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
         Eigen::Matrix3d& sphericalHessian )
 {
     computePotentialSphericalHessian(
@@ -128,7 +128,7 @@ Eigen::Matrix3d computeCumulativeSphericalHessian(
         const double gravitionalParameter,
         const Eigen::MatrixXd cosineHarmonicCoefficients,
         const Eigen::MatrixXd sineHarmonicCoefficients,
-        const boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache )
+        const std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache )
 {
     double preMultiplier = gravitionalParameter / referenceRadius;
 
@@ -158,7 +158,7 @@ Eigen::Matrix3d computePartialDerivativeOfBodyFixedSphericalHarmonicAcceleration
         const double gravitionalParameter,
         const Eigen::MatrixXd cosineHarmonicCoefficients,
         const Eigen::MatrixXd sineHarmonicCoefficients,
-        const boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
+        const std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
         const Eigen::Vector3d& sphericalPotentialGradient,
         const Eigen::Matrix3d& sphericalToCartesianGradientMatrix )
 {
@@ -186,7 +186,7 @@ Eigen::Matrix3d computePartialDerivativeOfBodyFixedSphericalHarmonicAcceleration
         const double gravitionalParameter,
         const Eigen::MatrixXd cosineHarmonicCoefficients,
         const Eigen::MatrixXd sineHarmonicCoefficients,
-        const boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache )
+        const std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache )
 {
     // Compute spherical position.
     Eigen::Vector3d sphericalPosition =
@@ -198,10 +198,11 @@ Eigen::Matrix3d computePartialDerivativeOfBodyFixedSphericalHarmonicAcceleration
             coordinate_conversions::getSphericalToCartesianGradientMatrix( cartesianPosition );
 
     // Compute spherical gradient.
+    std::map< std::pair< int, int >, Eigen::Vector3d > dummyMap;
     Eigen::Vector3d sphericalPotentialGradient = gradientTransformationMatrix.inverse( ) *
             gravitation::computeGeodesyNormalizedGravitationalAccelerationSum(
                 cartesianPosition, gravitionalParameter, referenceRadius, cosineHarmonicCoefficients,
-                sineHarmonicCoefficients, sphericalHarmonicsCache );
+                sineHarmonicCoefficients, sphericalHarmonicsCache, dummyMap );
 
     return computePartialDerivativeOfBodyFixedSphericalHarmonicAcceleration(
                 cartesianPosition, sphericalPosition, referenceRadius, gravitionalParameter, cosineHarmonicCoefficients,
@@ -214,14 +215,14 @@ void calculateSphericalHarmonicGravityWrtCCoefficients(
         const Eigen::Vector3d& sphericalPosition,
         const double referenceRadius,
         const double gravitionalParameter,
-        const boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
+        const std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
         const std::vector< std::pair< int, int > >& blockIndices,
         const Eigen::Matrix3d& sphericalToCartesianGradientMatrix,
         const Eigen::Matrix3d& bodyFixedToIntegrationFrame,
         Eigen::MatrixXd& partialsMatrix )
 {
     double preMultiplier = gravitionalParameter / referenceRadius;
-    const boost::shared_ptr< basic_mathematics::LegendreCache > legendreCache = sphericalHarmonicsCache->getLegendreCache( );
+    const std::shared_ptr< basic_mathematics::LegendreCache > legendreCache = sphericalHarmonicsCache->getLegendreCache( );
 
     int degree, order;
     for( unsigned int i = 0; i < blockIndices.size( ); i++ )
@@ -252,14 +253,14 @@ void calculateSphericalHarmonicGravityWrtSCoefficients(
         const Eigen::Vector3d& sphericalPosition,
         const double referenceRadius,
         const double gravitionalParameter,
-        const boost::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
+        const std::shared_ptr< basic_mathematics::SphericalHarmonicsCache > sphericalHarmonicsCache,
         const std::vector< std::pair< int, int > >& blockIndices,
         const Eigen::Matrix3d& sphericalToCartesianGradientMatrix,
         const Eigen::Matrix3d& bodyFixedToIntegrationFrame,
         Eigen::MatrixXd& partialsMatrix )
 {
     double preMultiplier = gravitionalParameter / referenceRadius;
-    const boost::shared_ptr< basic_mathematics::LegendreCache > legendreCache = sphericalHarmonicsCache->getLegendreCache( );
+    const std::shared_ptr< basic_mathematics::LegendreCache > legendreCache = sphericalHarmonicsCache->getLegendreCache( );
 
     int degree, order;
     for( unsigned int i = 0; i < blockIndices.size( ); i++ )

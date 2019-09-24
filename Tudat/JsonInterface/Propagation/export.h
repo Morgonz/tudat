@@ -12,6 +12,7 @@
 #define TUDAT_JSONINTERFACE_EXPORT_H
 
 #include "Tudat/SimulationSetup/PropagationSetup/dynamicsSimulator.h"
+#include "Tudat/SimulationSetup/EstimationSetup/variationalEquationsSolver.h"
 #include "Tudat/JsonInterface/Propagation/variable.h"
 
 #include "Tudat/JsonInterface/Support/valueAccess.h"
@@ -28,7 +29,7 @@ class ExportSettings
 public:
     //! Constructor.
     ExportSettings( const boost::filesystem::path& outputFile,
-                    const std::vector< boost::shared_ptr< propagators::VariableSettings > >& variables ) :
+                    const std::vector< std::shared_ptr< propagators::VariableSettings > >& variables ) :
         outputFile_( outputFile ), variables_( variables ) { }
 
     //! Destructor.
@@ -46,7 +47,7 @@ public:
     //! Variables to export.
     //! The variables will be exported to a table in which each row corresponds to an epoch,
     //! and the columns contain the values of the variables specified in this vector in the provided order.
-    std::vector< boost::shared_ptr< propagators::VariableSettings > > variables_;
+    std::vector< std::shared_ptr< propagators::VariableSettings > > variables_;
 
     //! Header to be included in the first line of the output file. If empty, no header will be added.
     std::string header_ = "";
@@ -62,13 +63,17 @@ public:
 
     //! Whether to print only the values corresponding to the final integration step.
     bool onlyFinalStep_ = false;
+
+    //! Whether to show, in the terminal, the indices in the output vector where variables are saved
+    bool printVariableIndicesToTerminal_ = false;
+
 };
 
 //! Create a `json` object from a shared pointer to a `ExportSettings` object.
-void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< ExportSettings >& saveSettings );
+void to_json( nlohmann::json& jsonObject, const std::shared_ptr< ExportSettings >& saveSettings );
 
 //! Create a shared pointer to a `ExportSettings` object from a `json` object.
-void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< ExportSettings >& saveSettings );
+void from_json( const nlohmann::json& jsonObject, std::shared_ptr< ExportSettings >& saveSettings );
 
 
 //! Export results of \p dynamicsSimulator according to the settings specified in \p exportSettingsVector.
@@ -76,13 +81,15 @@ void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< ExportSetti
  * @copybrief exportResultsOfDynamicsSimulator
  * \param singleArcDynamicsSimulator The dynamics simulator containing the results.
  * \param exportSettingsVector The vector containing export settings (each element represents a file to be exported).
+ * \param variationalEquationsAreSaved Boolean denoting whether to save the variational equations (default is false).
  * \throws std::exception If any of the requested variables is not recognized or was not stored in the results of
  * \p dynamicsSimulator.
  */
 template< typename TimeType = double, typename StateScalarType = double >
 void exportResultsOfDynamicsSimulator(
-        const boost::shared_ptr< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > >& singleArcDynamicsSimulator,
-        const std::vector< boost::shared_ptr< ExportSettings > >& exportSettingsVector )
+        const std::shared_ptr< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > >& singleArcDynamicsSimulator,
+        const std::vector< std::shared_ptr< ExportSettings > >& exportSettingsVector,
+        const bool variationalEquationsAreSaved = false )
 {
     using namespace propagators;
     using namespace input_output;
@@ -92,18 +99,25 @@ void exportResultsOfDynamicsSimulator(
     std::map< TimeType, Eigen::VectorXd > dependentVariables =
             singleArcDynamicsSimulator->getDependentVariableHistory( );
     std::map< TimeType, double > cpuTimes =
-            singleArcDynamicsSimulator->getCummulativeComputationTimeHistory( );
+            singleArcDynamicsSimulator->getCumulativeComputationTimeHistory( );
 
-    for ( boost::shared_ptr< ExportSettings > exportSettings : exportSettingsVector )
+    for ( std::shared_ptr< ExportSettings > exportSettings : exportSettingsVector )
     {
-        std::vector< boost::shared_ptr< VariableSettings > > variables;
+        std::vector< std::shared_ptr< VariableSettings > > variables;
         std::vector< unsigned int > variableSizes;
         std::vector< unsigned int > variableIndices;
 
         // Determine number of columns (not including first column = epoch).
         unsigned int cols = 0;
 
-        for ( boost::shared_ptr< VariableSettings > variable : exportSettings->variables_ )
+        if( exportSettings->printVariableIndicesToTerminal_ )
+        {
+            std::cout<<"Printing data to file: "<<exportSettings->outputFile_.filename( ).string( )<<
+                       "  output vectors contain:"<<std::endl;
+            std::cout<<"Vector entry, Vector contents"<<std::endl;
+        }
+
+        for ( std::shared_ptr< VariableSettings > variable : exportSettings->variables_ )
         {
             unsigned int variableSize = 0;
             unsigned int variableIndex = 0;
@@ -122,9 +136,9 @@ void exportResultsOfDynamicsSimulator(
             }
             case dependentVariable:
             {
-                const boost::shared_ptr< SingleDependentVariableSaveSettings > dependentVar =
-                        boost::dynamic_pointer_cast< SingleDependentVariableSaveSettings >( variable );
-                assertNonNullPointer( dependentVar );
+                const std::shared_ptr< SingleDependentVariableSaveSettings > dependentVar =
+                        std::dynamic_pointer_cast< SingleDependentVariableSaveSettings >( variable );
+                assertNonnullptrPointer( dependentVar );
                 try
                 {
                     const std::string variableID = getDependentVariableId( dependentVar );
@@ -157,6 +171,22 @@ void exportResultsOfDynamicsSimulator(
                 }
                 break;
             }
+            case stateTransitionMatrix:
+            {
+                if( !variationalEquationsAreSaved )
+                {
+                    throw std::runtime_error( "Error, requested save of state transition matrix, but only equations of motion available" );
+                }
+                break;
+            }
+            case sensitivityMatrix:
+            {
+                if( !variationalEquationsAreSaved )
+                {
+                    throw std::runtime_error( "Error, requested save of sensitivity matrix, but only equations of motion available" );
+                }
+                break;
+            }
             default:
             {
                 std::cerr << "Could not export results for variable of unsupported type "
@@ -171,8 +201,18 @@ void exportResultsOfDynamicsSimulator(
                 variableSizes.push_back( variableSize );
                 variableIndices.push_back( variableIndex );
 
+                if( exportSettings->printVariableIndicesToTerminal_ )
+                {
+                    std::cout<<cols<<", "<<getVariableId( variable )<<std::endl;
+                }
+
                 cols += variableSize;
             }
+        }
+
+        if( exportSettings->printVariableIndicesToTerminal_ )
+        {
+            std::cout<<std::endl;
         }
 
         // Concatenate requested results
@@ -194,7 +234,7 @@ void exportResultsOfDynamicsSimulator(
             Eigen::VectorXd result = Eigen::VectorXd::Zero( cols );
             for ( unsigned int i = 0; i < variables.size( ); ++i )
             {
-                const boost::shared_ptr< VariableSettings > variable = variables.at( i );
+                const std::shared_ptr< VariableSettings > variable = variables.at( i );
                 const unsigned int variableSize = variableSizes.at( i );
 
                 switch ( variable->variableType_ )
@@ -222,9 +262,18 @@ void exportResultsOfDynamicsSimulator(
                             dependentVariables.at( epoch ).segment( variableIndices.at( i ), variableSize );
                     break;
                 }
+                case stateTransitionMatrix:
+                {
+                    break;
+                }
+                case sensitivityMatrix:
+                {
+                    break;
+                }
                 default:
                     break;
                 }
+
                 currentIndex += variableSize;
             }
             results[ epoch ] = result;
@@ -255,6 +304,60 @@ void exportResultsOfDynamicsSimulator(
         }
     }
 }
+
+template< typename StateScalarType = double, typename TimeType = double >
+void exportResultsOfVariationalEquations(
+        const std::shared_ptr< propagators::SingleArcVariationalEquationsSolver< StateScalarType, TimeType > > variationalEquationsSolver,
+        const std::vector< std::shared_ptr< ExportSettings > >& exportSettingsVector )
+{
+    using namespace propagators;
+    using namespace input_output;
+
+    for ( std::shared_ptr< ExportSettings > exportSettings : exportSettingsVector )
+    {
+        for ( std::shared_ptr< VariableSettings > variable : exportSettings->variables_ )
+        {
+            switch ( variable->variableType_ )
+            {
+            case stateTransitionMatrix:
+            {
+                if ( exportSettings->epochsInFirstColumn_ )
+                {
+                    // Write results map to file.
+                    writeDataMapToTextFile( variationalEquationsSolver->getNumericalVariationalEquationsSolution( )[ 0 ],
+                                            exportSettings->outputFile_,
+                                            exportSettings->header_,
+                                            exportSettings->numericalPrecision_ );
+                }
+                else
+                {
+                    throw std::runtime_error( "Error saving state transition/sensitivity matrix without epochs not yet supported" );
+                }
+                break;
+            }
+            case sensitivityMatrix:
+            {
+                if ( exportSettings->epochsInFirstColumn_ )
+                {
+                    // Write results map to file.
+                    writeDataMapToTextFile( variationalEquationsSolver->getNumericalVariationalEquationsSolution( )[ 1 ],
+                                            exportSettings->outputFile_,
+                                            exportSettings->header_,
+                                            exportSettings->numericalPrecision_ );
+                }
+                else
+                {
+                    throw std::runtime_error( "Error saving state transition/sensitivity matrix without epochs not yet supported" );
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        }
+    }
+}
+
 
 } // namespace json_interface
 

@@ -19,7 +19,7 @@ namespace simulation_setup
 
 //! Create a `json` object from a shared pointer to a `RadiationPressureInterfaceSettings` object.
 void to_json( nlohmann::json& jsonObject,
-              const boost::shared_ptr< RadiationPressureInterfaceSettings >& radiationPressureInterfaceSettings )
+              const std::shared_ptr< RadiationPressureInterfaceSettings >& radiationPressureInterfaceSettings )
 {
     if ( ! radiationPressureInterfaceSettings )
     {
@@ -34,12 +34,12 @@ void to_json( nlohmann::json& jsonObject,
 
     switch ( radiationPressureType )
     {
-    case cannon_ball:
+    case cannon_ball_radiation_pressure_interface:
     {
-        boost::shared_ptr< CannonBallRadiationPressureInterfaceSettings > cannonBallRadiationPressureInterfaceSettings =
-                boost::dynamic_pointer_cast< CannonBallRadiationPressureInterfaceSettings >(
+        std::shared_ptr< CannonBallRadiationPressureInterfaceSettings > cannonBallRadiationPressureInterfaceSettings =
+                std::dynamic_pointer_cast< CannonBallRadiationPressureInterfaceSettings >(
                     radiationPressureInterfaceSettings );
-        assertNonNullPointer( cannonBallRadiationPressureInterfaceSettings );
+        assertNonnullptrPointer( cannonBallRadiationPressureInterfaceSettings );
         jsonObject[ K::referenceArea ] = cannonBallRadiationPressureInterfaceSettings->getArea( );
         jsonObject[ K::radiationPressureCoefficient ] =
                 cannonBallRadiationPressureInterfaceSettings->getRadiationPressureCoefficient( );
@@ -55,13 +55,13 @@ void to_json( nlohmann::json& jsonObject,
 
 //! Create a `json` object from a shared pointer to a `RadiationPressureInterfaceSettings` object.
 void from_json( const nlohmann::json& jsonObject,
-                boost::shared_ptr< RadiationPressureInterfaceSettings >& radiationPressureInterfaceSettings )
+                std::shared_ptr< RadiationPressureInterfaceSettings >& radiationPressureInterfaceSettings )
 {
     using namespace json_interface;
     using K = Keys::Body::RadiationPressure;
 
     // Get radiation pressure coefficient type (cannonBall by default)
-    const RadiationPressureType radiationPressureType = getValue( jsonObject, K::type, cannon_ball );
+    const RadiationPressureType radiationPressureType = getValue( jsonObject, K::type, cannon_ball_radiation_pressure_interface );
 
     // Get name of source body
     std::string sourceBody;
@@ -84,14 +84,14 @@ void from_json( const nlohmann::json& jsonObject,
 
     switch ( radiationPressureType )
     {
-    case cannon_ball:
+    case cannon_ball_radiation_pressure_interface:
     {
         // Reference area (either from the current object or from the current object's parent's parent, i.e. the body)
         const double referenceArea = getValue< double >(
                     jsonObject, { K::referenceArea, SpecialKeys::up / SpecialKeys::up / Keys::Body::referenceArea } );
 
         CannonBallRadiationPressureInterfaceSettings defaults( "", TUDAT_NAN, TUDAT_NAN );
-        radiationPressureInterfaceSettings = boost::make_shared< CannonBallRadiationPressureInterfaceSettings >(
+        radiationPressureInterfaceSettings = std::make_shared< CannonBallRadiationPressureInterfaceSettings >(
                     sourceBody,
                     referenceArea,
                     getValue< double >( jsonObject, K::radiationPressureCoefficient ),

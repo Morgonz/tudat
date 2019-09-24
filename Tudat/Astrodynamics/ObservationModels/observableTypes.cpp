@@ -8,6 +8,8 @@
  *    http://tudat.tudelft.nl/LICENSE.
  */
 
+#include <iostream>
+
 #include "Tudat/Astrodynamics/ObservationModels/observableTypes.h"
 #include "Tudat/Mathematics/BasicMathematics/mathematicalConstants.h"
 
@@ -31,6 +33,9 @@ std::string getObservableName( const ObservableType observableType, const int nu
         break;
     case position_observable:
         observableName = "CartesianPosition";
+        break;
+    case velocity_observable:
+        observableName = "CartesianVelocity";
         break;
     case one_way_doppler:
         observableName = "OneWayDoppler";
@@ -71,12 +76,16 @@ std::string getObservableName( const ObservableType observableType, const int nu
         observableName = numberOfWays + "WayRange";
         break;
     }
+    case euler_angle_313_observable:
+        observableName = "EulerAngle313";
+        break;
     default:
         std::string errorMessage =
                 "Error, could not find observable type " + std::to_string( observableType ) +
                 " when getting name from type";
         throw std::runtime_error( errorMessage );
     }
+
     return observableName;
 }
 
@@ -97,6 +106,10 @@ ObservableType getObservableType( const std::string& observableName )
     {
         observableType = position_observable;
     }
+    else if( observableName == "CartesianVelocity" )
+    {
+        observableType = velocity_observable;
+    }
     else if( observableName ==  "OneWayDoppler" )
     {
         observableType = one_way_doppler;
@@ -108,6 +121,10 @@ ObservableType getObservableType( const std::string& observableName )
     else if( observableName ==  "OneWayDifferencedRange" )
     {
         observableType = one_way_differenced_range;
+    }
+    else if( observableName == "EulerAngle313" )
+    {
+        observableType = euler_angle_313_observable;
     }
     else
     {
@@ -135,6 +152,9 @@ int getObservableSize( const ObservableType observableType )
     case position_observable:
         observableSize = 3;
         break;
+    case velocity_observable:
+        observableSize = 3;
+        break;
     case one_way_doppler:
         observableSize = 1;
         break;
@@ -146,6 +166,9 @@ int getObservableSize( const ObservableType observableType )
         break;
     case n_way_range:
         observableSize = 1;
+        break;
+    case euler_angle_313_observable:
+        observableSize = 3;
         break;
     default:
        std::string errorMessage = "Error, did not recognize observable " + std::to_string( observableType )
@@ -266,6 +289,35 @@ std::vector< int > getLinkEndIndicesForLinkEndTypeAtObservable(
                     std::to_string( observableType );
             throw std::runtime_error( errorMessage );
         }
+        break;
+    case euler_angle_313_observable:
+        if( linkEndType == observed_body )
+        {
+            linkEndIndices.push_back( 0 );
+        }
+        else
+        {
+            std::string errorMessage =
+                    "Error, could not find link end type index for link end " +
+                    std::to_string( linkEndType ) + " of observable " +
+                    std::to_string( observableType );
+            throw std::runtime_error( errorMessage );
+        }
+        break;
+    case velocity_observable:
+        if( linkEndType == observed_body )
+        {
+            linkEndIndices.push_back( 0 );
+        }
+        else
+        {
+            std::string errorMessage =
+                    "Error, could not find link end type index for link end " +
+                    std::to_string( linkEndType ) + " of observable " +
+                    std::to_string( observableType );
+            throw std::runtime_error( errorMessage );
+        }
+        break;
     case n_way_range:
         if( numberOfLinkEnds < 2 )
         {
@@ -295,6 +347,34 @@ std::vector< int > getLinkEndIndicesForLinkEndTypeAtObservable(
     }
 
     return linkEndIndices;
+}
+
+void checkObservationResidualDiscontinuities(
+        Eigen::Block< Eigen::VectorXd > observationResidualBlock,
+        const ObservableType observableType )
+{
+    if( observableType == angular_position || observableType == euler_angle_313_observable )
+    {
+        for( int i = 1; i < observationResidualBlock.rows( ); i++ )
+        {
+            if( std::fabs( observationResidualBlock( i, 0 ) - observationResidualBlock( i - 1, 0 ) ) > 6.0 )
+            {
+                if( observationResidualBlock( i, 0 ) > 0 )
+                {
+                    observationResidualBlock( i, 0 ) = observationResidualBlock( i, 0 ) - 2.0 * mathematical_constants::PI;
+                }
+                else
+                {
+                    observationResidualBlock( i, 0 ) = observationResidualBlock( i, 0 ) + 2.0 * mathematical_constants::PI;
+                }
+            }
+            else if( std::fabs( observationResidualBlock( i, 0 ) - observationResidualBlock( i - 1, 0 ) ) > 3.0 )
+            {
+                std::cerr<<"Warning, detected jump in observation residual of size "<<std::fabs( observationResidualBlock( i, 0 ) - observationResidualBlock( i - 1, 0 ) )<<
+                           " for observable type "<<observableType<<std::endl;
+            }
+        }
+    }
 }
 
 }

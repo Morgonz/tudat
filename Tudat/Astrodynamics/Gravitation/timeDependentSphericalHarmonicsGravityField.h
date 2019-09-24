@@ -11,7 +11,7 @@
 #ifndef TUDAT_TIMEDEPENDENTSPHERICALHARMONICSGRAVITYFIELD_H
 #define TUDAT_TIMEDEPENDENTSPHERICALHARMONICSGRAVITYFIELD_H
 
-#include <boost/function.hpp>
+#include <functional>
 #include <boost/make_shared.hpp>
 
 #include <vector>
@@ -56,15 +56,18 @@ public:
      *  coefficients.
      *  \param fixedReferenceFrame Identifier for body-fixed reference frame to which the field is
      *  fixed (optional).
+     *  \param updateInertiaTensor Function that is to be called to update the inertia tensor (typicaly in Body class; default
+     *  empty)
      */
     TimeDependentSphericalHarmonicsGravityField(
             const double gravitationalParameter, const double referenceRadius,
             const Eigen::MatrixXd& nominalCosineCoefficients,
             const Eigen::MatrixXd& nominalSineCoefficients,
-            const std::string& fixedReferenceFrame = "" ):
+            const std::string& fixedReferenceFrame = "",
+            const std::function< void( ) > updateInertiaTensor = std::function< void( ) > ( ) ):
         SphericalHarmonicsGravityField(
             gravitationalParameter, referenceRadius, nominalCosineCoefficients,
-            nominalSineCoefficients, fixedReferenceFrame ),
+            nominalSineCoefficients, fixedReferenceFrame, updateInertiaTensor ),
         nominalSineCoefficients_( nominalSineCoefficients ),
         nominalCosineCoefficients_( nominalCosineCoefficients )
     { }
@@ -87,7 +90,7 @@ public:
             const double gravitationalParameter, const double referenceRadius,
             const Eigen::MatrixXd& nominalCosineCoefficients,
             const Eigen::MatrixXd& nominalSineCoefficients,
-            const boost::shared_ptr< GravityFieldVariationsSet > gravityFieldVariationUpdateSettings,
+            const std::shared_ptr< GravityFieldVariationsSet > gravityFieldVariationUpdateSettings,
             const std::string& fixedReferenceFrame = "" ):
         SphericalHarmonicsGravityField(
             gravitationalParameter, referenceRadius,
@@ -121,9 +124,9 @@ public:
     void updateCorrectionFunctions( )
     {
         // Check if field variation set exists.
-        if( gravityFieldVariationsSet_ == NULL )
+        if( gravityFieldVariationsSet_ == nullptr )
         {
-            throw std::runtime_error( "Warning, gravity field coefficient update functions are NULL when requesting update" );
+            throw std::runtime_error( "Warning, gravity field coefficient update functions are nullptr when requesting update" );
         }
         else
         {
@@ -143,13 +146,13 @@ public:
      *  should be immediately updated with new settings.
      */
     void setFieldVariationSettings(
-           const boost::shared_ptr< GravityFieldVariationsSet > gravityFieldVariationUpdateSettings,
+           const std::shared_ptr< GravityFieldVariationsSet > gravityFieldVariationUpdateSettings,
            const bool updateCorrections = 1 );
 
     //! Function to clear all gravity field variations
     /*!
      *  Function to clear all gravity field variations, the gravityFieldVariationsSet_ is set to
-     *  NULL, and the correctionFunctions_ list is cleared.
+     *  nullptr, and the correctionFunctions_ list is cleared.
      */
     void clearVariations( );
 
@@ -161,6 +164,35 @@ public:
     Eigen::MatrixXd getNominalCosineCoefficients( )
     {
         return nominalCosineCoefficients_;
+    }
+
+    //! Get current total correction to cosine coefficients
+    /*!
+     * Get current total correction to cosine coefficients up to given degree and order
+     * \param maximumDegree Maximum degree of coefficients
+     * \param maximumOrder Maximum order of coefficients
+     * \return Total correction to cosine coefficients up to given degree and order
+     */
+    Eigen::MatrixXd getTotalCosineCoefficientCorrection(
+            const int maximumDegree, const int maximumOrder )
+    {
+        return cosineCoefficients_.block( 0, 0, maximumDegree + 1, maximumOrder + 1 ) -
+                nominalCosineCoefficients_.block( 0, 0, maximumDegree + 1, maximumOrder + 1 );
+    }
+
+    //! Get current total correction to sine coefficients
+    /*!
+     * Get current total correction to sine coefficients up to given degree and order
+     * \param maximumDegree Maximum degree of coefficients
+     * \param maximumOrder Maximum order of coefficients
+     * \return Total correction to sine coefficients up to given degree and order
+     */
+    Eigen::MatrixXd getTotalSineCoefficientCorrection(
+            const int maximumDegree, const int maximumOrder )
+
+    {
+        return sineCoefficients_.block( 0, 0, maximumDegree + 1, maximumOrder + 1 ) -
+                nominalSineCoefficients_.block( 0, 0, maximumDegree + 1, maximumOrder + 1 );
     }
 
     //! Set nominal (i.e. with zero variations) cosine coefficients.
@@ -237,7 +269,7 @@ public:
     /*!
      *  Function to get object containing all gravity field variations and related settings
      */
-    boost::shared_ptr< GravityFieldVariationsSet > getGravityFieldVariationsSet( )
+    std::shared_ptr< GravityFieldVariationsSet > getGravityFieldVariationsSet( )
     {
         return gravityFieldVariationsSet_;
     }
@@ -267,7 +299,7 @@ private:
      *  created from a GravityFieldVariations object, or the addSphericalHarmonicsCorrections of the
      *  GravityFieldVariations object directly.
      */
-    std::vector< boost::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) > >
+    std::vector< std::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) > >
         correctionFunctions_;
 
     //! Object containing all GravityFieldVariations objects and update settings.
@@ -275,7 +307,7 @@ private:
      *  Object containing all GravityFieldVariations objects and update settings
      *  (i.e. time settings for interpolator)
      */
-    boost::shared_ptr< GravityFieldVariationsSet > gravityFieldVariationsSet_;
+    std::shared_ptr< GravityFieldVariationsSet > gravityFieldVariationsSet_;
 
 };
 

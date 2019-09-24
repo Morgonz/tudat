@@ -106,10 +106,17 @@ Eigen::Vector6d computeGaussPlanetaryEquationsForKeplerElements(
 
     return  computeGaussPlanetaryEquationsForKeplerElements(
                 currentOsculatingKeplerElements,
-                reference_frames::getInertialToRswSatelliteCenteredFrameRotationMatrx(
+                reference_frames::getInertialToRswSatelliteCenteredFrameRotationMatrix(
                     currentCartesianState ) * accelerationsInInertialFrame, centralBodyGravitationalParameter );
 }
 
+template class NBodyGaussKeplerStateDerivative< double, double >;
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+template class NBodyGaussKeplerStateDerivative< long double, double >;
+template class NBodyGaussKeplerStateDerivative< double, Time >;
+template class NBodyGaussKeplerStateDerivative< long double, Time >;
+#endif
 
 } // namespace propagators
 

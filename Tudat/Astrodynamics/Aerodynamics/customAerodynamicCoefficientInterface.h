@@ -12,7 +12,7 @@
 #define TUDAT_CUSTOM_AERODYNAMIC_COEFFICIENT_INTERFACE_H
 
 #include <boost/lambda/lambda.hpp>
-#include <boost/function.hpp>
+#include <functional>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 
@@ -66,9 +66,9 @@ public:
      *  coefficients are typically defined in negative direction (default true).
      */
     CustomAerodynamicCoefficientInterface(
-            const boost::function< Eigen::Vector3d( const std::vector< double >& ) >
+            const std::function< Eigen::Vector3d( const std::vector< double >& ) >
             forceCoefficientFunction,
-            const boost::function< Eigen::Vector3d( const std::vector< double >& ) >
+            const std::function< Eigen::Vector3d( const std::vector< double >& ) >
             momentCoefficientFunction,
             const double referenceLength,
             const double referenceArea,
@@ -83,8 +83,8 @@ public:
                                          areCoefficientsInAerodynamicFrame,
                                          areCoefficientsInNegativeAxisDirection )
     {
-        coefficientFunction_ = boost::bind(
-                    &concatenateForceAndMomentCoefficients, forceCoefficientFunction, momentCoefficientFunction, _1 );
+        coefficientFunction_ = std::bind(
+                    &concatenateForceAndMomentCoefficients, forceCoefficientFunction, momentCoefficientFunction, std::placeholders::_1 );
     }
 
     //! Constructor.
@@ -110,7 +110,7 @@ public:
      *  coefficients are typically defined in negative direction (default true).
      */
     CustomAerodynamicCoefficientInterface(
-            const boost::function< Eigen::Vector6d( const std::vector< double >& ) >
+            const std::function< Eigen::Vector6d( const std::vector< double >& ) >
             coefficientFunction,
             const double referenceLength,
             const double referenceArea,
@@ -135,8 +135,10 @@ public:
      *  numberOfIndependentVariables_
      *  \param independentVariables Independent variables of force and moment coefficient
      *  determination implemented by derived class
+     *  \param currentTime Time to which coefficients are to be updated (used in the case of arc-wise constant coefficients).
      */
-    virtual void updateCurrentCoefficients( const std::vector< double >& independentVariables )
+    virtual void updateCurrentCoefficients( const std::vector< double >& independentVariables,
+                                            const double currentTime = TUDAT_NAN )
     {
         // Check if the correct number of aerodynamic coefficients is provided.
         if( independentVariables.size( ) != numberOfIndependentVariables_ )
@@ -148,6 +150,11 @@ public:
         }
 
         // Update current coefficients.
+        if( timeUpdateFunction_ !=  nullptr )
+        {
+            timeUpdateFunction_( currentTime );
+        }
+
         Eigen::Vector6d currentCoefficients = coefficientFunction_(
                     independentVariables );
         currentForceCoefficients_ = currentCoefficients.segment( 0, 3 );
@@ -168,16 +175,47 @@ public:
         {
             throw std::runtime_error( "Error when setting constant aerodynamic coefficients, numberOfIndependentVariables_ is not equal to 0 " );
         }
-        coefficientFunction_ = boost::lambda::constant( constantCoefficients );
+        coefficientFunction_ = [ = ]( const std::vector< double >& ){ return constantCoefficients; };
     }
+
+    //! Function to retrieve constant aerodynamic coefficients, only valid if coefficients are already constant
+    /*!
+     * Function to retrieve the constant aerodynamic coefficients, only valid if coefficients are already constant. Function
+     * checks if the numberOfIndependentVariables_ is equal to zero, and throws an error if it is not.
+     * \return Force and moment coefficients (in that order) expressed in the same frame as existing
+     * coefficients.
+     */
+   Eigen::Vector6d getConstantCoefficients( )
+   {
+       if( numberOfIndependentVariables_ != 0 )
+       {
+           throw std::runtime_error( "Error when getting constant aerodynamic coefficients, numberOfIndependentVariables_ is not equal to 0 " );
+       }
+
+       return coefficientFunction_( std::vector< double >( ) );
+   }
+
+   //! Function to perform the closure for time-varying (arc-wise constant) coefficients
+   /*!
+    * Function to perform the closure for time-varying (arc-wise constant) coefficients
+    * \param coefficientFunction Function that returns the coefficients for the current arc
+    * \param timeUpdateFunction Function that sets the coefficients for the current arc (in an external class/function)
+    */
+   void setTimeDependentCoefficientClosure(
+           std::function< Eigen::Vector6d( ) > coefficientFunction,
+           std::function< void( const double ) > timeUpdateFunction )
+   {
+        coefficientFunction_ = [ = ]( const std::vector< double >& ){ return coefficientFunction( ); };
+        timeUpdateFunction_ = timeUpdateFunction;
+   }
 
 private:
 
-    //! Function returning the concatenated aerodynamic force and moment coefficients as function of
-    //! the set of independent variables.
-    boost::function< Eigen::Vector6d( const std::vector< double >& ) >
-    coefficientFunction_;
+    //! Function returning the concatenated aerodynamic force and moment coefficients as function of the set of independent variables.
+    std::function< Eigen::Vector6d( const std::vector< double >& ) > coefficientFunction_;
 
+    //! Function that sets the coefficients for the current arc (in an external class/function)
+    std::function< void( const double ) > timeUpdateFunction_ =  nullptr;
 
 };
 

@@ -31,7 +31,7 @@ std::vector< unsigned int > getBulirschStoerStepSequence(
         const ExtrapolationMethodStepSequences& extrapolationMethodStepSequenceType,
         const unsigned int lengthOfSequence )
 {
-    std::vector< unsigned int >  stepSequence;
+    std::vector< unsigned int > stepSequence;
     switch ( extrapolationMethodStepSequenceType )
     {
     case bulirsch_stoer_sequence:
@@ -55,6 +55,11 @@ std::vector< unsigned int > getBulirschStoerStepSequence(
 
     return stepSequence;
 }
+
+template class BulirschStoerVariableStepSizeIntegrator < double, Eigen::VectorXd, Eigen::VectorXd >;
+template class BulirschStoerVariableStepSizeIntegrator < double, Eigen::Vector6d, Eigen::Vector6d >;
+template class BulirschStoerVariableStepSizeIntegrator < double, Eigen::MatrixXd, Eigen::MatrixXd >;
+
 
 } // namespace numerical_integrators
 

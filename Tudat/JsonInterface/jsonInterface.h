@@ -12,6 +12,7 @@
 #define TUDAT_JSONINTERFACE_H
 
 #include "Tudat/SimulationSetup/tudatSimulationHeader.h"
+
 #include "Support/deserialization.h"
 #include "Support/valueAccess.h"
 #include "Support/valueConversions.h"
@@ -29,19 +30,54 @@ namespace tudat
 namespace json_interface
 {
 
+enum JsonSimulationTypes
+{
+    equations_of_motion_propagation,
+    variational_equations_propagation,
+    state_estimation
+};
+
+
+//! Map of `ObservableType` string representations.
+static std::map< JsonSimulationTypes, std::string > simulationTypes =
+{
+    { equations_of_motion_propagation, "EoM" },
+    { variational_equations_propagation, "Variational" },
+    { state_estimation, "Estimation" }
+};
+
+//! Map of `ObservableType` string representations.
+static std::map< std::string, JsonSimulationTypes > simulationTypesInverse =
+{
+    { "EoM", equations_of_motion_propagation },
+    { "Variational", variational_equations_propagation },
+    { "Estimation", state_estimation }
+
+};
+
+//! Convert `ObservableType` to `json`.
+inline void to_json( nlohmann::json& jsonObject, const JsonSimulationTypes& simulationType )
+{
+    jsonObject = json_interface::stringFromEnum( simulationType, simulationTypes );
+}
+
+//! Convert `json` to `ObservableType`.
+inline void from_json( const nlohmann::json& jsonObject, JsonSimulationTypes& simulationType )
+{
+    simulationType = json_interface::enumFromString( jsonObject, simulationTypes );
+}
+
 //! Class for managing JSON-based simulations.
 template< typename TimeType = double, typename StateScalarType = double >
 class JsonSimulationManager
 {
-private:
-    bool profiling = false;
 
 public:
     //! Constructor from JSON file.
     /*!
      * Constructor.
      * \param inputFilePath Path to the root JSON input file. Can be absolute or relative (to the working directory).
-     * \param initialClockTime Initial clock time from which the cummulative CPU time during the propagation will be
+     * \param initialClockTime Initial clock time from which the cumulative CPU time during the propagation will be
      * computed. Default is the moment at which the constructor was called.
      */
     JsonSimulationManager(
@@ -56,7 +92,7 @@ public:
     /*!
      * Constructor.
      * \param jsonObject The root JSON object.
-     * \param initialClockTime Initial clock time from which the cummulative CPU time during the propagation will be
+     * \param initialClockTime Initial clock time from which the cumulative CPU time during the propagation will be
      * computed. Default is the moment at which the constructor was called.
      */
     JsonSimulationManager(
@@ -92,7 +128,11 @@ public:
         originalJsonObject_ = jsonObject_;
     }
 
-    //! Update all the settings (objects) from the JSON object.
+    virtual void createSimulationObjects( )
+    {
+        resetDynamicsSimulator( );
+    }
+
     virtual void updateSettings( )
     {
         // Clear global variable keeping track of the keys that have been accessed
@@ -105,13 +145,19 @@ public:
             initialClockTime_ = std::chrono::steady_clock::now( );
         }
 
+        simulationType_ =
+                simulationTypesInverse.at( getValue< std::string >( jsonObject_, Keys::simulationType, "EoM" ) );
+
         resetIntegratorSettings( );
         resetSpice( );
         resetBodies( );              // must be called after resetIntegratorSettings and resetSpice
         resetExportSettings( );
         resetPropagatorSettings( );  // must be called after resetBodies and resetExportSettings
         resetApplicationOptions( );
-        resetDynamicsSimulator( );
+        if( simulationType_ == equations_of_motion_propagation )
+        {
+            createSimulationObjects( );
+        }
     }
 
     //! Run the propagation.
@@ -150,8 +196,7 @@ public:
             std::cout << "Propagation of file " << inputFilePath_ << " started." << std::endl;
         }
 
-        // Run simulation
-        dynamicsSimulator_->integrateEquationsOfMotion( propagatorSettings_->getInitialStates( ) );
+        runJsonSimulation( );
 
         // Print message on propagation termination if requested
         if ( applicationOptions_->notifyOnPropagationTermination_ )
@@ -183,16 +228,17 @@ public:
     virtual void exportResults( )
     {
         if ( applicationOptions_->tagOutputFilesIfPropagationFails_ &&
-             ! dynamicsSimulator_->integrationCompletedSuccessfully( ) )
+             !dynamicsSimulator_->integrationCompletedSuccessfully( ) )
         {
             // Add header "FAILURE" to output files
-            for ( boost::shared_ptr< ExportSettings >& exportSettings : exportSettingsVector_ )
+            for ( std::shared_ptr< ExportSettings >& exportSettings : exportSettingsVector_ )
             {
                 exportSettings->header_ = "FAILURE\n" + exportSettings->header_;
             }
         }
 
-        exportResultsOfDynamicsSimulator( dynamicsSimulator_, exportSettingsVector_ );
+        exportResultsOfDynamicsSimulator( dynamicsSimulator_, exportSettingsVector_,
+                                          !( simulationType_ == equations_of_motion_propagation ) );
 
         if ( profiling )
         {
@@ -201,6 +247,12 @@ public:
             initialClockTime_ = std::chrono::steady_clock::now( );
         }
     }
+
+    virtual void runJsonSimulation( )
+    {
+        dynamicsSimulator_->integrateEquationsOfMotion( propagatorSettings_->getInitialStates( ) );
+    }
+
 
     //! Export `this` as a `json` object.
     /*!
@@ -283,7 +335,7 @@ public:
     //! Get maximum simulation end epoch. Returns `TUDAT_NAN` if there is no time termination condition.
     TimeType getEndEpoch( ) const
     {
-        TimeType endEpoch = getTerminationEpoch< TimeType >( propagatorSettings_ );
+        TimeType endEpoch = getTerminationEpoch< TimeType >( propagatorSettings_->getTerminationSettings( ) );
         if ( ! isNaN( endEpoch ) )
         {
             return endEpoch;
@@ -295,13 +347,13 @@ public:
     }
 
     //! Get integrator settings.
-    boost::shared_ptr< numerical_integrators::IntegratorSettings< TimeType > > getIntegratorSettings( ) const
+    std::shared_ptr< numerical_integrators::IntegratorSettings< TimeType > > getIntegratorSettings( ) const
     {
         return integratorSettings_;
     }
 
-    //! Get Spice settings (NULL if Spice is not used).
-    boost::shared_ptr< SpiceSettings > getSpiceSettings( ) const
+    //! Get Spice settings (nullptr if Spice is not used).
+    std::shared_ptr< SpiceSettings > getSpiceSettings( ) const
     {
         return spiceSettings_;
     }
@@ -319,7 +371,7 @@ public:
     }
 
     //! Get map of body settings.
-    std::map< std::string, boost::shared_ptr< simulation_setup::BodySettings > > getBodySettingsMap( ) const
+    std::map< std::string, std::shared_ptr< simulation_setup::BodySettings > > getBodySettingsMap( ) const
     {
         return bodySettingsMap_;
     }
@@ -333,41 +385,41 @@ public:
     //! Add a body named \p bodyName.
     void addBody( const std::string& bodyName )
     {
-        bodyMap_[ bodyName ] = boost::make_shared< simulation_setup::Body >( );
+        bodyMap_[ bodyName ] = std::make_shared< simulation_setup::Body >( );
     }
 
     //! Get body named \p bodyName.
-    boost::shared_ptr< simulation_setup::Body > getBody( const std::string& bodyName ) const
+    std::shared_ptr< simulation_setup::Body > getBody( const std::string& bodyName ) const
     {
         return bodyMap_.at( bodyName );
     }
 
     //! Get propagator settings.
-    boost::shared_ptr< propagators::MultiTypePropagatorSettings< StateScalarType > > getPropagatorSettings( ) const
+    std::shared_ptr< propagators::MultiTypePropagatorSettings< StateScalarType > > getPropagatorSettings( ) const
     {
         return propagatorSettings_;
     }
 
     //! Get vector of export settings (each element corresponds to an output file).
-    std::vector< boost::shared_ptr< ExportSettings > > getExportSettingsVector( ) const
+    std::vector< std::shared_ptr< ExportSettings > > getExportSettingsVector( ) const
     {
         return exportSettingsVector_;
     }
 
     //! Get export settings at \p index.
-    boost::shared_ptr< ExportSettings > getExportSettings( const unsigned int index ) const
+    std::shared_ptr< ExportSettings > getExportSettings( const unsigned int index ) const
     {
         return exportSettingsVector_.at( index );
     }
 
     //! Get application options.
-    boost::shared_ptr< ApplicationOptions > getApplicationOptions( ) const
+    std::shared_ptr< ApplicationOptions > getApplicationOptions( ) const
     {
         return applicationOptions_;
     }
 
     //! Get dynamics simulator.
-    boost::shared_ptr< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > > getDynamicsSimulator( ) const
+    std::shared_ptr< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > > getDynamicsSimulator( ) const
     {
         return dynamicsSimulator_;
     }
@@ -375,13 +427,15 @@ public:
 
 protected:
 
+    bool profiling = false;
+
     //! Reset integratorSettings_ from the current jsonObject_.
     /*!
      * @copybrief resetIntegratorSettings
      */
     virtual void resetIntegratorSettings( )
     {
-        updateFromJSON( integratorSettings_, jsonObject_, Keys::integrator );
+        updateFromJSON( this->integratorSettings_, jsonObject_, Keys::integrator );
 
         if ( profiling )
         {
@@ -398,7 +452,7 @@ protected:
      */
     virtual void resetSpice( )
     {
-        spiceSettings_ = NULL;
+        spiceSettings_ = nullptr;
         updateFromJSONIfDefined( spiceSettings_, jsonObject_, Keys::spice );
         loadSpiceKernels( spiceSettings_ );
 
@@ -452,7 +506,8 @@ protected:
      * Tries to infer the initial states from the body ephemeris if not provided.
      * Creates the integrated state models using bodyMap_
      */
-    virtual void resetPropagatorSettings( )
+    virtual void
+    resetPropagatorSettings( )
     {
         // Update jsonObject_ by determining initial states if not provided directly to the propagator settings:
         // * By obtaining the initial states from body properties (and transforming to Cartesian if necessary)
@@ -468,7 +523,12 @@ protected:
 
         // Update propagatorSettings_ from jsonObject_
         updateFromJSON( propagatorSettings_, jsonObject_ );
-
+        if ( profiling )
+        {
+            std::cout << "resetExportSettings: " << std::chrono::duration_cast< std::chrono::milliseconds >(
+                             std::chrono::steady_clock::now( ) - initialClockTime_ ).count( ) * 1.0e-3 << " s" << std::endl;
+            initialClockTime_ = std::chrono::steady_clock::now( );
+        }
         if ( profiling )
         {
             std::cout << "resetPropagatorSettings@updateFromJSON: " << std::chrono::duration_cast< std::chrono::milliseconds >(
@@ -487,7 +547,7 @@ protected:
         }
 
         // Update dependent variables to save
-        resetDependentVariableSaveSettings( propagatorSettings_, exportSettingsVector_ );
+        resetDependentVariableSaveSettings< StateScalarType >( propagatorSettings_, exportSettingsVector_ );
 
         if ( profiling )
         {
@@ -503,7 +563,7 @@ protected:
      */
     virtual void resetApplicationOptions( )
     {
-        applicationOptions_ = boost::make_shared< ApplicationOptions >( );
+        applicationOptions_ = std::make_shared< ApplicationOptions >( );
         updateFromJSONIfDefined( applicationOptions_, jsonObject_, Keys::options );
 
         if ( profiling )
@@ -521,8 +581,8 @@ protected:
     virtual void resetDynamicsSimulator( )
     {
         dynamicsSimulator_ =
-                boost::make_shared< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > >(
-                    bodyMap_, integratorSettings_, propagatorSettings_, false, false, false, initialClockTime_ );
+                std::make_shared< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > >(
+                    bodyMap_, integratorSettings_, propagatorSettings_, false, false, false, false, initialClockTime_ );
 
         if ( profiling )
         {
@@ -532,12 +592,13 @@ protected:
         }
     }
 
-
     //! Integrator settings.
-    boost::shared_ptr< numerical_integrators::IntegratorSettings< TimeType > > integratorSettings_;
+    std::shared_ptr< numerical_integrators::IntegratorSettings< TimeType > > integratorSettings_;
 
-    //! Spice settings (NULL if Spice is not used).
-    boost::shared_ptr< SpiceSettings > spiceSettings_;
+    //! Spice settings (nullptr if Spice is not used).
+    std::shared_ptr< SpiceSettings > spiceSettings_;
+
+    JsonSimulationTypes simulationType_;
 
     //! Global frame origin.
     std::string globalFrameOrigin_;
@@ -546,30 +607,27 @@ protected:
     std::string globalFrameOrientation_;
 
     //! Map of body settings.
-    std::map< std::string, boost::shared_ptr< simulation_setup::BodySettings > > bodySettingsMap_;
+    std::map< std::string, std::shared_ptr< simulation_setup::BodySettings > > bodySettingsMap_;
 
     //! Body map.
     simulation_setup::NamedBodyMap bodyMap_;
 
     //! Propagation settings.
-    boost::shared_ptr< propagators::MultiTypePropagatorSettings< StateScalarType > > propagatorSettings_;
+    std::shared_ptr< propagators::MultiTypePropagatorSettings< StateScalarType > > propagatorSettings_;
 
     //! Vector of export settings (each element corresponds to an output file).
-    std::vector< boost::shared_ptr< ExportSettings > > exportSettingsVector_;
+    std::vector< std::shared_ptr< ExportSettings > > exportSettingsVector_;
 
     //! Application options.
-    boost::shared_ptr< ApplicationOptions > applicationOptions_;
+    std::shared_ptr< ApplicationOptions > applicationOptions_;
 
     //! Dynamics simulator.
-    boost::shared_ptr< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > > dynamicsSimulator_;
-
-
-private:
+    std::shared_ptr< propagators::SingleArcDynamicsSimulator< StateScalarType, TimeType > > dynamicsSimulator_;
 
     //! Update the JSON object with all the data from the current settings (objests).
     void updateJsonObjectFromSettings( )
     {
-        jsonObject_ = boost::make_shared< JsonSimulationManager< TimeType, StateScalarType > >( *this );
+        jsonObject_ = std::make_shared< JsonSimulationManager< TimeType, StateScalarType > >( *this );
     }
 
     //! Absolute path to the input file.
@@ -586,11 +644,18 @@ private:
 
 };
 
+extern template class JsonSimulationManager< double, double >;
+
+#if( BUILD_EXTENDED_PRECISION_PROPAGATION_TOOLS )
+extern template class JsonSimulationManager< double, long double >;
+//extern template class JsonSimulationManager< Time, double >;
+//extern template class JsonSimulationManager< Time, long double >;
+#endif
 
 //! Function to create a `json` object from a Simulation object.
 template< typename TimeType, typename StateScalarType >
 void to_json( nlohmann::json& jsonObject,
-              const boost::shared_ptr< JsonSimulationManager< TimeType, StateScalarType > >& jsonSimulationManager )
+              const std::shared_ptr< JsonSimulationManager< TimeType, StateScalarType > >& jsonSimulationManager )
 {
     if ( ! jsonSimulationManager )
     {
@@ -601,7 +666,7 @@ void to_json( nlohmann::json& jsonObject,
     jsonObject[ Keys::integrator ] = jsonSimulationManager->getIntegratorSettings( );
 
     // spice
-    assignIfNotNull( jsonObject, Keys::spice, jsonSimulationManager->getSpiceSettings( ) );
+    assignIfNotnullptr( jsonObject, Keys::spice, jsonSimulationManager->getSpiceSettings( ) );
 
     // bodies
     jsonObject[ Keys::globalFrameOrigin ] = jsonSimulationManager->getGlobalFrameOrigin( );
@@ -615,7 +680,8 @@ void to_json( nlohmann::json& jsonObject,
     jsonObject[ Keys::options ] = jsonSimulationManager->getApplicationOptions( );
 
     // propagation + termination + options.printInterval
-    propagators::to_json( jsonObject, jsonSimulationManager->getPropagatorSettings( ) );
+    propagators::to_json( jsonObject, std::dynamic_pointer_cast<
+                          propagators::SingleArcPropagatorSettings< StateScalarType > >( jsonSimulationManager->getPropagatorSettings( ) ) );
 }
 
 } // namespace json_interface

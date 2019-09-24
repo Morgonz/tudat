@@ -16,7 +16,7 @@
 #ifndef TUDAT_APPROXIMATE_PLANET_POSITIONS_H
 #define TUDAT_APPROXIMATE_PLANET_POSITIONS_H
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "Tudat/Mathematics/BasicMathematics/mathematicalConstants.h"
 
@@ -47,20 +47,30 @@ public:
      * members are initialized to default values (NAN).
      *
      * \param bodyWithEphemerisData The body for which the position is approximated.
-     * \param aSunGravitationalParameter The gravitational parameter of the Sun [m^3/s^2].
-     * \param referenceJulianDate Reference julian day w.r.t. which ephemeris is evaluated.
+     * \param sunGravitationalParameter The gravitational parameter of the Sun [m^3/s^2].
      * \sa BodiesWithEphemerisData, ApproximatePlanetPositionsBase.
      */
     ApproximatePlanetPositions( BodiesWithEphemerisData bodyWithEphemerisData,
-                                const double aSunGravitationalParameter = 1.32712440018e20,
-                                const double referenceJulianDate = basic_astrodynamics::JULIAN_DAY_ON_J2000 )
-        : ApproximatePlanetPositionsBase( aSunGravitationalParameter ),
-          referenceJulianDate_( referenceJulianDate ),
+                                const double sunGravitationalParameter = 1.32712440018e20 )
+        : ApproximatePlanetPositionsBase( sunGravitationalParameter ),
           eccentricAnomalyAtGivenJulianDate_( TUDAT_NAN ),
           longitudeOfPerihelionAtGivenJulianDate_( TUDAT_NAN ),
           meanAnomalyAtGivenJulianDate_( TUDAT_NAN ),
           trueAnomalyAtGivenJulianData_( TUDAT_NAN )
     {
+        setPlanet( bodyWithEphemerisData );
+    }
+
+    ApproximatePlanetPositions( const std::string& bodyName,
+                                const double sunGravitationalParameter = 1.32712440018e20 )
+        : ApproximatePlanetPositionsBase( sunGravitationalParameter ),
+          eccentricAnomalyAtGivenJulianDate_( TUDAT_NAN ),
+          longitudeOfPerihelionAtGivenJulianDate_( TUDAT_NAN ),
+          meanAnomalyAtGivenJulianDate_( TUDAT_NAN ),
+          trueAnomalyAtGivenJulianData_( TUDAT_NAN )
+    {
+        BodiesWithEphemerisData bodyWithEphemerisData = ApproximatePlanetPositionsBase::getBodiesWithEphemerisDataId(
+                    bodyName );
         setPlanet( bodyWithEphemerisData );
     }
 
@@ -85,8 +95,6 @@ public:
 protected:
 
 private:
-
-    double referenceJulianDate_;
 
     //! Eccentric anomaly at given Julian date.
     /*!
@@ -114,7 +122,7 @@ private:
 };
 
 //! Typedef for shared-pointer to ApproximatePlanetPositions object.
-typedef boost::shared_ptr< ApproximatePlanetPositions > ApproximatePlanetPositionsPointer;
+typedef std::shared_ptr< ApproximatePlanetPositions > ApproximatePlanetPositionsPointer;
 
 } // namespace ephemerides
 } // namespace tudat

@@ -13,7 +13,7 @@
 
 #include <map>
 
-#include <boost/function.hpp>
+#include <functional>
 
 #include "Tudat/Astrodynamics/OrbitDetermination/EstimatableParameters/estimatableParameter.h"
 
@@ -46,8 +46,8 @@ public:
      * \param associatedBody Name of body for which sine coefficients are to be estimated.
      */
     SphericalHarmonicsSineCoefficients(
-            const boost::function< Eigen::MatrixXd( ) > getSineCoefficients,
-            const boost::function< void( Eigen::MatrixXd ) > setSineCoefficients,
+            const std::function< Eigen::MatrixXd( ) > getSineCoefficients,
+            const std::function< void( Eigen::MatrixXd ) > setSineCoefficients,
             const std::vector< std::pair< int, int > >& blockIndices,
             const std::string& associatedBody ):
         EstimatableParameter< Eigen::VectorXd >( spherical_harmonics_sine_coefficient_block, associatedBody ),
@@ -109,15 +109,42 @@ public:
         return parameterDescription;
     }
 
+    //! Function that returns the indices for degree two coefficients (if any)
+    /*!
+     * Function that returns the indices for degree two coefficients (if any)
+     * \param s21Index Index for degree=2, order=1 entry (-1 if none; returned by reference)
+     * \param s22Index Index for degree=2, order=2 entry (-1 if none; returned by reference)
+     */
+    void getDegreeTwoEntries(
+            int& s21Index, int& s22Index )
+    {
+        s21Index = -1;
+        s22Index = -1;
+
+        for( unsigned int i = 0; i < blockIndices_.size( ); i++ )
+        {
+
+            if( blockIndices_.at( i ).first == 2 && blockIndices_.at( i ).second == 1 )
+            {
+               s21Index = i;
+            }
+
+            if( blockIndices_.at( i ).first == 2 && blockIndices_.at( i ).second == 2 )
+            {
+               s22Index = i;
+            }
+        }
+    }
+
 protected:
 
 private:
 
     //! Function to retrieve the full set of sine coefficients, of which a subset is to be estimated.
-    boost::function< Eigen::MatrixXd( ) > getSineCoefficients_;
+    std::function< Eigen::MatrixXd( ) > getSineCoefficients_;
 
     //! Function to reset the full set of sine coefficients, of which a subset is to be estimated.
-    boost::function< void( Eigen::MatrixXd ) > setSineCoefficients_;
+    std::function< void( Eigen::MatrixXd ) > setSineCoefficients_;
 
     //! List of sine coefficient indices which are to be estimated
     /*!

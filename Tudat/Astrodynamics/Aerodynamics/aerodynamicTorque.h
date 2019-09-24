@@ -12,9 +12,9 @@
 #ifndef TUDAT_AERODYNAMIC_TORQUE_H
 #define TUDAT_AERODYNAMIC_TORQUE_H
 
-#include <boost/function.hpp>
+#include <functional>
 #include <boost/lambda/lambda.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
@@ -23,6 +23,7 @@
 
 namespace tudat
 {
+
 namespace aerodynamics
 {
 
@@ -83,10 +84,10 @@ class AerodynamicTorque : public basic_astrodynamics::TorqueModel
 private:
 
     //! Typedef for double-returning function.
-    typedef boost::function< double ( ) > DoubleReturningFunction;
+    typedef std::function< double ( ) > DoubleReturningFunction;
 
     //! Typedef for coefficient-returning function.
-    typedef boost::function< Eigen::Vector3d( ) > CoefficientReturningFunction;
+    typedef std::function< Eigen::Vector3d( ) > CoefficientReturningFunction;
 
 public:
 
@@ -115,7 +116,7 @@ public:
         referenceAreaFunction_( referenceAreaFunction ),
         referenceLengthsFunction_( referenceLengthsFunction )
     {
-        coefficientMultiplier_ = areCoefficientsInNegativeDirection == true ? -1.0 : 1.0;
+        coefficientMultiplier_ = areCoefficientsInNegativeDirection ? -1.0 : 1.0;
     }
 
     //! Get aerodynamic torque.
@@ -157,7 +158,6 @@ public:
         }
     }
 
-
 private:
 
     //! Function to retrieve the current aerodynamic moment coefficients.
@@ -189,7 +189,6 @@ private:
     //! Current airspeed, as set by updateMembers function.
     double currentAirspeed_;
 
-
     //! Current reference area, as set by updateMembers function.
     double currentReferenceArea_;
 
@@ -198,8 +197,8 @@ private:
 
 };
 
-
 } // namespace aerodynamics
+
 } // namespace tudat
 
 #endif // TUDAT_AERODYNAMIC_TORQUE_H

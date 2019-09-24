@@ -14,6 +14,7 @@
 #include "Tudat/Astrodynamics/Aerodynamics/aerodynamicAcceleration.h"
 #include "Tudat/Astrodynamics/Aerodynamics/flightConditions.h"
 #include "Tudat/Astrodynamics/ReferenceFrames/aerodynamicAngleCalculator.h"
+#include "Tudat/Astrodynamics/OrbitDetermination/EstimatableParameters/constantDragCoefficient.h"
 
 #include "Tudat/Astrodynamics/OrbitDetermination/AccelerationPartials/accelerationPartial.h"
 
@@ -44,10 +45,10 @@ public:
      * \param acceleratingBody Body exerting acceleration.
      */
     AerodynamicAccelerationPartial(
-            const boost::shared_ptr< aerodynamics::AerodynamicAcceleration > aerodynamicAcceleration,
-            const boost::shared_ptr< aerodynamics::FlightConditions > flightConditions,
-            const boost::function< Eigen::Vector6d( ) > vehicleStateGetFunction,
-            const boost::function< void( const Eigen::Vector6d& ) > vehicleStateSetFunction,
+            const std::shared_ptr< aerodynamics::AerodynamicAcceleration > aerodynamicAcceleration,
+            const std::shared_ptr< aerodynamics::AtmosphericFlightConditions > flightConditions,
+            const std::function< Eigen::Vector6d( ) > vehicleStateGetFunction,
+            const std::function< void( const Eigen::Vector6d& ) > vehicleStateSetFunction,
             const std::string acceleratedBody,
             const std::string acceleratingBody ):
         AccelerationPartial( acceleratedBody, acceleratingBody, basic_astrodynamics::aerodynamic ),
@@ -164,12 +165,12 @@ public:
      *  \param integratedStateType Type of propagated state for which dependency is to be determined.
      *  \return True if dependency exists (non-zero partial), false otherwise.
      */
-    bool isStateDerivativeDependentOnIntegratedNonTranslationalState(
-                const std::pair< std::string, std::string >& stateReferencePoint,
-                const propagators::IntegratedStateType integratedStateType )
+    bool isStateDerivativeDependentOnIntegratedAdditionalStateTypes(
+            const std::pair< std::string, std::string >& stateReferencePoint,
+            const propagators::IntegratedStateType integratedStateType )
     {
         if( ( ( stateReferencePoint.first == acceleratingBody_ ||
-              ( stateReferencePoint.first == acceleratedBody_  ) )
+                ( stateReferencePoint.first == acceleratedBody_  ) )
               && integratedStateType == propagators::body_mass_state ) )
         {
             throw std::runtime_error( "Warning, dependency of aerodynamic acceleration on body masses not yet implemented" );
@@ -184,10 +185,10 @@ public:
      *  \param parameter Parameter w.r.t. which partial is to be taken.
      *  \return Pair of parameter partial function and number of columns in partial (0 for no dependency, 1 otherwise).
      */
-    std::pair< boost::function< void( Eigen::MatrixXd& ) >, int >
-    getParameterPartialFunction( boost::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter )
+    std::pair< std::function< void( Eigen::MatrixXd& ) >, int >
+    getParameterPartialFunction( std::shared_ptr< estimatable_parameters::EstimatableParameter< double > > parameter )
     {
-        boost::function< void( Eigen::MatrixXd& ) > partialFunction;
+        std::function< void( Eigen::MatrixXd& ) > partialFunction;
         int numberOfColumns = 0;
 
         // Check if parameter is gravitational parameter.
@@ -196,11 +197,10 @@ public:
             // Check if parameter body is accelerated body,
             if( parameter->getParameterName( ).second.first == acceleratedBody_ )
             {
-                partialFunction = boost::bind(
+                partialFunction = std::bind(
                             &AerodynamicAccelerationPartial::computeAccelerationPartialWrtCurrentDragCoefficient,
-                            this, _1 );
+                            this, std::placeholders::_1 );
                 numberOfColumns = 1;
-
             }
         }
 
@@ -214,11 +214,37 @@ public:
      *  \param parameter Parameter w.r.t. which partial is to be taken.
      *  \return Pair of parameter partial function and number of columns in partial (0 for no dependency).
      */
-    std::pair< boost::function< void( Eigen::MatrixXd& ) >, int > getParameterPartialFunction(
-            boost::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > parameter )
+    std::pair< std::function< void( Eigen::MatrixXd& ) >, int > getParameterPartialFunction(
+            std::shared_ptr< estimatable_parameters::EstimatableParameter< Eigen::VectorXd > > parameter )
     {
-        boost::function< void( Eigen::MatrixXd& ) > partialFunction;
-        return std::make_pair( partialFunction, 0 );
+        std::function< void( Eigen::MatrixXd& ) > partialFunction;
+        int numberOfColumns = 0;
+
+        // Check if parameter is arc-wise constant drag coefficient
+        if( parameter->getParameterName( ).first ==  estimatable_parameters::arc_wise_constant_drag_coefficient )
+        {
+            // Check if parameter body is accelerated body,
+            if( parameter->getParameterName( ).second.first == acceleratedBody_ )
+            {
+                if( std::dynamic_pointer_cast< estimatable_parameters::ArcWiseConstantDragCoefficient >( parameter ) != nullptr )
+                {
+                    partialFunction = std::bind(
+                                &AerodynamicAccelerationPartial::computeAccelerationPartialWrtArcwiseDragCoefficient,
+                                this, std::placeholders::_1,
+                                std::dynamic_pointer_cast< estimatable_parameters::ArcWiseConstantDragCoefficient >( parameter ) );
+                    numberOfColumns = parameter->getParameterSize( );
+
+                }
+                else
+                {
+                    throw std::runtime_error( "Error when making radiation drag, arcwise drag parameter not consistent" );
+                }
+
+
+            }
+        }
+
+        return std::make_pair( partialFunction, numberOfColumns );
     }
 
     //! Function for updating partial w.r.t. the bodies' positions
@@ -232,19 +258,52 @@ public:
 protected:
 
     //! Function to compute the partial derivative of the acceleration w.r.t. the drag coefficient
+    /*!
+     * Function to compute the partial derivative of the acceleration w.r.t. the drag coefficient
+     * \param accelerationPartial Derivative of acceleration w.r.t. drag coefficient (returned by reference).
+     */
     void computeAccelerationPartialWrtCurrentDragCoefficient( Eigen::MatrixXd& accelerationPartial )
     {
         Eigen::Quaterniond rotationToInertialFrame =
                 flightConditions_->getAerodynamicAngleCalculator( )->getRotationQuaternionBetweenFrames(
-                   reference_frames::aerodynamic_frame, reference_frames::inertial_frame );
+                    reference_frames::aerodynamic_frame, reference_frames::inertial_frame );
 
         double currentAirspeed = flightConditions_->getCurrentAirspeed( );
         accelerationPartial =
                 rotationToInertialFrame * Eigen::Vector3d::UnitX( ) * (
-                -0.5 * flightConditions_->getCurrentDensity( ) * currentAirspeed * currentAirspeed *
-                flightConditions_->getAerodynamicCoefficientInterface( )->getReferenceArea( ) ) /
+                    -0.5 * flightConditions_->getCurrentDensity( ) * currentAirspeed * currentAirspeed *
+                    flightConditions_->getAerodynamicCoefficientInterface( )->getReferenceArea( ) ) /
                 aerodynamicAcceleration_->getCurrentMass( );
 
+    }
+
+    //! Function to compute the partial derivative of the acceleration w.r.t. the arc-wise constant drag coefficient
+    /*!
+     * Function to compute the partial derivative of the acceleration w.r.t. the arc-wise constant drag coefficient
+     * \param accelerationPartial Derivative of acceleration w.r.t. arc-wise constant drag coefficient (returned by reference).
+     * \param parameter Parameter object containing information on arcwise drag coefficient that is to be estimated
+     */
+    void computeAccelerationPartialWrtArcwiseDragCoefficient(
+            Eigen::MatrixXd& accelerationPartial,
+            const std::shared_ptr< estimatable_parameters::ArcWiseConstantDragCoefficient > parameter )
+    {
+        // Get partial w.r.t. rdrag coefficient
+        Eigen::MatrixXd partialWrtSingleParameter = Eigen::Vector3d::Zero( );
+        this->computeAccelerationPartialWrtCurrentDragCoefficient( partialWrtSingleParameter );
+
+        // Retrieve current arc
+        std::shared_ptr< interpolators::LookUpScheme< double > > currentArcIndexLookUp =
+                parameter->getArcTimeLookupScheme( );
+        int currentArc = currentArcIndexLookUp->findNearestLowerNeighbour( currentTime_ );
+
+        if( currentArc >= accelerationPartial.cols( ) )
+        {
+            throw std::runtime_error( "Error when getting arc-wise radiation pressure coefficient partials, data not consistent" );
+        }
+
+        // Set partial
+        accelerationPartial.setZero( 3, parameter->getNumberOfArcs( ) );
+        accelerationPartial.block( 0, currentArc, 3, 1 ) = partialWrtSingleParameter;
     }
 
     //! Perturbations of Cartesian state used in the numerical (central difference) computation of
@@ -255,17 +314,17 @@ protected:
     Eigen::Matrix< double, 3, 6 > currentAccelerationStatePartials_;
 
     //! Object that computes the aerodynamic acceleration
-    boost::shared_ptr< aerodynamics::AerodynamicAcceleration > aerodynamicAcceleration_;
+    std::shared_ptr< aerodynamics::AerodynamicAcceleration > aerodynamicAcceleration_;
 
     //! Object that computes the current atmospheric and flight conditions, as well as associated angles, for the body undergoing
     //! acceleration
-    boost::shared_ptr< aerodynamics::FlightConditions > flightConditions_;
+    std::shared_ptr< aerodynamics::AtmosphericFlightConditions > flightConditions_;
 
     //! Function to retrieve the state of the body undergoing the acceleration.
-    boost::function< Eigen::Vector6d( ) > vehicleStateGetFunction_;
+    std::function< Eigen::Vector6d( ) > vehicleStateGetFunction_;
 
     //! Function to set the state of the body undergoing the acceleration
-    boost::function< void( const Eigen::Vector6d& ) > vehicleStateSetFunction_;
+    std::function< void( const Eigen::Vector6d& ) > vehicleStateSetFunction_;
 
 };
 

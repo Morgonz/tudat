@@ -15,9 +15,9 @@
 #include <map>
 
 #include <boost/bind.hpp>
-#include <boost/function.hpp>
+#include <functional>
 #include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <Eigen/Core>
 
@@ -25,6 +25,7 @@
 
 namespace tudat
 {
+
 namespace basic_mathematics
 {
 
@@ -48,14 +49,17 @@ public:
     /*!
      * the independent and dependent variables are both doubles.
      */
-    typedef BasicFunction< IndependentVariable, DependentVariable >           Parent;
+    typedef BasicFunction< IndependentVariable, DependentVariable > Parent;
+
     //! Typedef for the function that relates the dependent variable to the independent variable.
     /*!
      * the independent and dependent variables are both doubles.
      */
-    typedef boost::function< DependentVariable( IndependentVariable ) >       FunctionSignature;
+    typedef std::function< DependentVariable( IndependentVariable ) > FunctionSignature;
+
     //! Typedef for a shared pointer to the class FunctionProxy
-    typedef boost::shared_ptr< FunctionProxy >                                FunctionProxyPointer;
+    typedef std::shared_ptr< FunctionProxy > FunctionProxyPointer;
+
 
     //! Create a Function object, using a specified function pointer.
     /*!
@@ -132,12 +136,13 @@ private:
 
     //! Lookup table used to find explicit derivative or integral forms.
     std::map< int, FunctionSignature >  functionCallTable_;
+
 };
 
 // Type definitions for the commonly used double form.
-typedef FunctionProxy< double, double >         UnivariateProxy;
-typedef UnivariateProxy::FunctionSignature      UnivariateSignature;
-typedef UnivariateProxy::FunctionProxyPointer   UnivariateProxyPointer;
+typedef FunctionProxy< double, double > UnivariateProxy;
+typedef UnivariateProxy::FunctionSignature UnivariateSignature;
+typedef UnivariateProxy::FunctionProxyPointer UnivariateProxyPointer;
 
 //! Factory for creating a UnivariateProxyPointer from a C++ function UnivariateSignature.
 /*!
@@ -146,7 +151,7 @@ typedef UnivariateProxy::FunctionProxyPointer   UnivariateProxyPointer;
 inline UnivariateProxyPointer univariateProxy( UnivariateSignature function )
 {
     // Return shared pointer to univariate function.
-    return boost::make_shared< UnivariateProxy >( function );
+    return std::make_shared< UnivariateProxy >( function );
 }
 
 //! Factory for creating a UnivaritateProxyPtr from a C++ function UnivariateSignature, with one
@@ -161,7 +166,7 @@ inline UnivariateProxyPointer univariateProxy( UnivariateSignature function,
                                                const int order1, UnivariateSignature function1 )
 {
     // Create shared pointer to univariate function.
-    UnivariateProxyPointer functionPointer = boost::make_shared< UnivariateProxy >( function );
+    UnivariateProxyPointer functionPointer = std::make_shared< UnivariateProxy >( function );
 
     // Add a binding for an explicit form of the function derivative or integral.
     functionPointer->addBinding( order1, function1 );
@@ -186,7 +191,7 @@ inline UnivariateProxyPointer univariateProxy( UnivariateSignature function,
                                                const int order2, UnivariateSignature function2 )
 {
     // Create shared pointer to univariate function.
-    UnivariateProxyPointer functionPointer = boost::make_shared< UnivariateProxy >( function );
+    UnivariateProxyPointer functionPointer = std::make_shared< UnivariateProxy >( function );
 
     // Add bindings for the explicit form of the function derivative(s) or integral(s).
     functionPointer->addBinding( order1, function1 );
@@ -216,7 +221,7 @@ inline UnivariateProxyPointer univariateProxy( UnivariateSignature function,
                                                const int order3, UnivariateSignature function3 )
 {
     // Create shared pointer to univariate function.
-    UnivariateProxyPointer functionPointer = boost::make_shared< UnivariateProxy >( function );
+    UnivariateProxyPointer functionPointer = std::make_shared< UnivariateProxy >( function );
 
     // Add bindings for the explicit form of the function derivative(s) or integral(s).
     functionPointer->addBinding( order1, function1 );
@@ -228,6 +233,7 @@ inline UnivariateProxyPointer univariateProxy( UnivariateSignature function,
 }
 
 } // namespace basic_mathematics
+
 } // namespace tudat
 
 #endif // TUDAT_FUNCTION_PROXY_H

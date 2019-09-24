@@ -32,14 +32,14 @@ const std::map< int, double >& getCentralDifferenceCoefficients( CentralDifferen
     {
         // Initialize the coefficients map
         coefficients[ order2 ] = std::map< int, double >( );
-        coefficients[ order2 ][ -1] = -1.0 / 2.0;
-        coefficients[ order2 ][ 1] = 1.0 / 2.0;
+        coefficients[ order2 ][ -1 ] = -1.0 / 2.0;
+        coefficients[ order2 ][ 1 ] = 1.0 / 2.0;
 
         coefficients[ order4 ] = std::map< int, double >( );
-        coefficients[ order4 ][ -2] = 1.0 / 12.0;
-        coefficients[ order4 ][ -1] = -2.0 / 3.0;
-        coefficients[ order4 ][ 1] = 2.0 / 3.0;
-        coefficients[ order4 ][ 2] = -1.0 / 12.0;
+        coefficients[ order4 ][ -2 ] = 1.0 / 12.0;
+        coefficients[ order4 ][ -1 ] = -2.0 / 3.0;
+        coefficients[ order4 ][ 1 ] = 2.0 / 3.0;
+        coefficients[ order4 ][ 2 ] = -1.0 / 12.0;
 
         coefficients[ order6 ] = std::map< int, double >( );
         coefficients[ order6 ][ -3 ] = -1.0 / 60.0;
@@ -63,7 +63,7 @@ const std::map< int, double >& getCentralDifferenceCoefficients( CentralDifferen
     return coefficients[ order ];
 }
 
-Eigen::MatrixXd computeCentralDifference( const Eigen::VectorXd& input, const boost::function<
+Eigen::MatrixXd computeCentralDifference( const Eigen::VectorXd& input, const std::function<
                                           Eigen::VectorXd( const Eigen::VectorXd& ) >& function,
                                           double minimumStep, double relativeStepSize,
                                           CentralDifferenceOrders order )

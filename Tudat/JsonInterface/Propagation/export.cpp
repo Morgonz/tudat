@@ -18,7 +18,7 @@ namespace json_interface
 {
 
 //! Create a `json` object from a shared pointer to a `ExportSettings` object.
-void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< ExportSettings >& exportSettings )
+void to_json( nlohmann::json& jsonObject, const std::shared_ptr< ExportSettings >& exportSettings )
 {
     if ( ! exportSettings )
     {
@@ -33,22 +33,25 @@ void to_json( nlohmann::json& jsonObject, const boost::shared_ptr< ExportSetting
     jsonObject[ K::onlyInitialStep ] = exportSettings->onlyInitialStep_;
     jsonObject[ K::onlyFinalStep ] = exportSettings->onlyFinalStep_;
     jsonObject[ K::numericalPrecision ] = exportSettings->numericalPrecision_;
+    jsonObject[ K::printVariableIndicesToTerminal ] = exportSettings->printVariableIndicesToTerminal_;
 }
 
 //! Create a shared pointer to a `ExportSettings` object from a `json` object.
-void from_json( const nlohmann::json& jsonObject, boost::shared_ptr< ExportSettings >& exportSettings )
+void from_json( const nlohmann::json& jsonObject, std::shared_ptr< ExportSettings >& exportSettings )
 {
     using namespace propagators;
     using K = Keys::Export;
 
-    exportSettings = boost::make_shared< ExportSettings >(
+    exportSettings = std::make_shared< ExportSettings >(
                 getValue< boost::filesystem::path >( jsonObject, K::file ),
-                getValue< std::vector< boost::shared_ptr< VariableSettings > > >( jsonObject, K::variables ) );
+                getValue< std::vector< std::shared_ptr< VariableSettings > > >( jsonObject, K::variables ) );
     updateFromJSONIfDefined( exportSettings->header_, jsonObject, K::header );
     updateFromJSONIfDefined( exportSettings->epochsInFirstColumn_, jsonObject, K::epochsInFirstColumn );
     updateFromJSONIfDefined( exportSettings->onlyInitialStep_, jsonObject, K::onlyInitialStep );
     updateFromJSONIfDefined( exportSettings->onlyFinalStep_, jsonObject, K::onlyFinalStep );
     updateFromJSONIfDefined( exportSettings->numericalPrecision_, jsonObject, K::numericalPrecision );
+    updateFromJSONIfDefined( exportSettings->printVariableIndicesToTerminal_, jsonObject, K::printVariableIndicesToTerminal );
+
 }
 
 } // namespace simulation_setup

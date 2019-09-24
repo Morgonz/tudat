@@ -14,7 +14,6 @@
 
 #include <boost/test/unit_test.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/assign/list_of.hpp>
 
 #include <Eigen/Core>
 
@@ -28,7 +27,7 @@
 #include "Tudat/External/SpiceInterface/spiceEphemeris.h"
 #include "Tudat/InputOutput/basicInputOutput.h"
 #include "Tudat/Mathematics/Interpolators/linearInterpolator.h"
-#include "Tudat/SimulationSetup/PropagationSetup/createNumericalSimulator.h"
+#include "Tudat/SimulationSetup/EstimationSetup/createNumericalSimulator.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/createBodies.h"
 #include "Tudat/SimulationSetup/EnvironmentSetup/defaultBodies.h"
 #include "Tudat/Astrodynamics/Aerodynamics/UnitTests/testApolloCapsuleCoefficients.h"
@@ -58,7 +57,7 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
     spice_interface::loadStandardSpiceKernels( );
 
     // Get settings for celestial bodies
-    std::map< std::string, boost::shared_ptr< BodySettings > > bodySettings;
+    std::map< std::string, std::shared_ptr< BodySettings > > bodySettings;
     bodySettings[ "Earth" ] = getDefaultSingleBodySettings( "Earth", 0.0, 10.0 * 86400.0 );
     bodySettings[ "Sun" ] = getDefaultSingleBodySettings( "Sun", 0.0,10.0 * 86400.0 );
     bodySettings[ "Moon" ] = getDefaultSingleBodySettings( "Moon", 0.0,10.0 * 86400.0 );
@@ -88,7 +87,7 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
               3.088038821491940e-7, 0.0, 0.0, -9.436980733957690e-8, -3.233531925405220e-7,
               -2.149554083060460e-7, 4.980705501023510e-8, -6.693799351801650e-7
               ).finished( );
-    bodySettings[ "Earth" ]->gravityFieldSettings = boost::make_shared< SphericalHarmonicsGravityFieldSettings >(
+    bodySettings[ "Earth" ]->gravityFieldSettings = std::make_shared< SphericalHarmonicsGravityFieldSettings >(
                 gravitationalParameter, 6378.0E3, cosineCoefficients, sineCoefficients,
                 "IAU_Earth" );
 
@@ -109,16 +108,16 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
         // Define (arbitrary) test state.
         Eigen::VectorXd testState = ( Eigen::VectorXd( 6 ) << 1.44E6, 2.234E8, -3343.246E7, 1.2E4, 1.344E3, -22.343E3 ).finished( );
-        integratedStateToSet[ transational_state ] = testState;
+        integratedStateToSet[ translational_state ] = testState;
         testTime = 2.0 * 86400.0;
 
         // Test if environment is updated for inly central gravity accelerations
         {
             // Define accelerations
             accelerationSettingsMap[ "Moon" ][ "Sun" ].push_back(
-                        boost::make_shared< AccelerationSettings >( central_gravity ) );
+                        std::make_shared< AccelerationSettings >( central_gravity ) );
             accelerationSettingsMap[ "Moon" ][ "Earth" ].push_back(
-                        boost::make_shared< AccelerationSettings >( central_gravity ) );
+                        std::make_shared< AccelerationSettings >( central_gravity ) );
 
             // Define origin of integration to be barycenter.
             centralBodies[ "Moon" ] = "SSB";
@@ -130,8 +129,8 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
                         bodyMap, accelerationSettingsMap, centralBodies );
 
             // Create environment update settings.
-            boost::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
-                    boost::make_shared< TranslationalStatePropagatorSettings< double > >(
+            std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
+                    std::make_shared< TranslationalStatePropagatorSettings< double > >(
                         centralBodyList, accelerationsMap, propagatedBodyList, getInitialStateOfBody(
                             "Moon", centralBodies[ "Moon" ], bodyMap, initialTime ), finalTime );
             std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > environmentModelsToUpdate =
@@ -139,11 +138,11 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Test update settings
             BOOST_CHECK_EQUAL( environmentModelsToUpdate.size( ), 1 );
-            BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_transational_state_update ), 1 );
-            BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_transational_state_update ).size( ), 2 );
+            BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_translational_state_update ), 1 );
+            BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_translational_state_update ).size( ), 2 );
 
             // Create and call updater.
-            boost::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
+            std::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
                     createEnvironmentUpdaterForDynamicalEquations< double, double >(
                         propagatorSettings, bodyMap );
             updater->updateEnvironment( testTime, integratedStateToSet );
@@ -168,8 +167,7 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Update environment to new time, and state from environment.
             updater->updateEnvironment(
-                        0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ),
-                        boost::assign::list_of( transational_state ) );
+                        0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ), { translational_state } );
             TUDAT_CHECK_MATRIX_CLOSE_FRACTION(
                         bodyMap.at( "Earth" )->getState( ),
                         bodyMap.at( "Earth" )->getEphemeris( )->getCartesianState( 0.5 * testTime ),
@@ -196,9 +194,9 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Set acceleration models.
             accelerationSettingsMap[ "Moon" ][ "Sun" ].push_back(
-                        boost::make_shared< AccelerationSettings >( central_gravity ) );
+                        std::make_shared< AccelerationSettings >( central_gravity ) );
             accelerationSettingsMap[ "Moon" ][ "Mars" ].push_back(
-                        boost::make_shared< AccelerationSettings >( central_gravity ) );
+                        std::make_shared< AccelerationSettings >( central_gravity ) );
 
             // Define origin of integration
             centralBodies[ "Moon" ] = "Earth";
@@ -210,8 +208,8 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
                         bodyMap, accelerationSettingsMap, centralBodies );
 
             // Create environment update settings.
-            boost::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
-                    boost::make_shared< TranslationalStatePropagatorSettings< double > >(
+            std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
+                    std::make_shared< TranslationalStatePropagatorSettings< double > >(
                         centralBodyList, accelerationsMap, propagatedBodyList, getInitialStateOfBody(
                             "Moon", centralBodies[ "Moon" ], bodyMap, initialTime ), finalTime );
             std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > environmentModelsToUpdate =
@@ -219,11 +217,11 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Test update settings
             BOOST_CHECK_EQUAL( environmentModelsToUpdate.size( ), 1 );
-            BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_transational_state_update ), 1 );
-            BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_transational_state_update ).size( ), 3 );
+            BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_translational_state_update ), 1 );
+            BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_translational_state_update ).size( ), 3 );
 
             // Create and call updater.
-            boost::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
+            std::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
                     createEnvironmentUpdaterForDynamicalEquations< double, double >(
                         propagatorSettings, bodyMap );
             updater->updateEnvironment( testTime, integratedStateToSet );
@@ -252,8 +250,7 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Update environment to new time, and state from environment.
             updater->updateEnvironment(
-                        0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ),
-                        boost::assign::list_of( transational_state ) );
+                        0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ), { translational_state } );
 
         }
 
@@ -266,11 +263,11 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Set acceleration models.
             accelerationSettingsMap[ "Moon" ][ "Sun" ].push_back(
-                        boost::make_shared< AccelerationSettings >( central_gravity ) );
+                        std::make_shared< AccelerationSettings >( central_gravity ) );
             accelerationSettingsMap[ "Moon" ][ "Earth" ].push_back(
-                        boost::make_shared< SphericalHarmonicAccelerationSettings >( 5, 5 ) );
+                        std::make_shared< SphericalHarmonicAccelerationSettings >( 5, 5 ) );
             accelerationSettingsMap[ "Moon" ][ "Mars" ].push_back(
-                        boost::make_shared< AccelerationSettings >( central_gravity ) );
+                        std::make_shared< AccelerationSettings >( central_gravity ) );
 
             // Define origin of integration
             centralBodies[ "Moon" ] = "Earth";
@@ -282,8 +279,8 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
                         bodyMap, accelerationSettingsMap, centralBodies );
 
             // Create environment update settings.
-            boost::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
-                    boost::make_shared< TranslationalStatePropagatorSettings< double > >(
+            std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
+                    std::make_shared< TranslationalStatePropagatorSettings< double > >(
                         centralBodyList, accelerationsMap, propagatedBodyList, getInitialStateOfBody(
                             "Moon", centralBodies[ "Moon" ], bodyMap, initialTime ), finalTime );
             std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > environmentModelsToUpdate =
@@ -291,14 +288,14 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Test update settings
             BOOST_CHECK_EQUAL( environmentModelsToUpdate.size( ), 3 );
-            BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_transational_state_update ), 1 );
-            BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_transational_state_update ).size( ), 3 );
+            BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_translational_state_update ), 1 );
+            BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_translational_state_update ).size( ), 3 );
             BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_rotational_state_update ), 1 );
             BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_rotational_state_update ).size( ), 1 );
             BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( spherical_harmonic_gravity_field_update ), 1 );
 
             // Create and call updater.
-            boost::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
+            std::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
                     createEnvironmentUpdaterForDynamicalEquations< double, double >(
                         propagatorSettings, bodyMap );
             updater->updateEnvironment( testTime, integratedStateToSet );
@@ -359,8 +356,7 @@ BOOST_AUTO_TEST_CASE( test_centralGravityEnvironmentUpdate )
 
             // Update environment to new time, and state from environment.
             updater->updateEnvironment(
-                        0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ),
-                        boost::assign::list_of( transational_state ) );
+                        0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ), { translational_state } );
 
         }
     }
@@ -385,18 +381,18 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
     spice_interface::loadStandardSpiceKernels( );
 
     // Get settings for celestial bodies
-    std::map< std::string, boost::shared_ptr< BodySettings > > bodySettings;
+    std::map< std::string, std::shared_ptr< BodySettings > > bodySettings;
     bodySettings[ "Earth" ] = getDefaultSingleBodySettings( "Earth", 0.0, 10.0 * 86400.0 );
     bodySettings[ "Sun" ] = getDefaultSingleBodySettings( "Sun", 0.0,10.0 * 86400.0 );
 
     // Get settings for vehicle
     double area = 2.34;
     double coefficient = 1.2;
-    bodySettings[ "Vehicle" ] = boost::make_shared< BodySettings >( );
+    bodySettings[ "Vehicle" ] = std::make_shared< BodySettings >( );
     bodySettings[ "Vehicle" ]->radiationPressureSettings[ "Sun" ] =
-            boost::make_shared< CannonBallRadiationPressureInterfaceSettings >( "Sun", area, coefficient );
+            std::make_shared< CannonBallRadiationPressureInterfaceSettings >( "Sun", area, coefficient );
     bodySettings[ "Vehicle" ]->ephemerisSettings =
-            boost::make_shared< KeplerEphemerisSettings >(
+            std::make_shared< KeplerEphemerisSettings >(
                 ( Eigen::Vector6d( ) << 7000.0E3, 0.05, 0.3, 0.0, 0.0, 0.0 ).finished( ),
                 0.0, spice_interface::getBodyGravitationalParameter( "Earth" ), "Earth", "ECLIPJ2000" );
 
@@ -413,13 +409,13 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
     std::unordered_map< IntegratedStateType, Eigen::VectorXd > integratedStateToSet;
     Eigen::VectorXd testState = 1.1 * bodyMap[ "Vehicle" ]->getEphemeris( )->getCartesianState( testTime ) +
             bodyMap.at( "Earth" )->getEphemeris( )->getCartesianState( testTime );
-    integratedStateToSet[ transational_state ] = testState;
+    integratedStateToSet[ translational_state ] = testState;
 
     {
         // Define settings for accelerations
         SelectedAccelerationMap accelerationSettingsMap;
         accelerationSettingsMap[ "Vehicle" ][ "Sun" ].push_back(
-                    boost::make_shared< AccelerationSettings >( cannon_ball_radiation_pressure ) );
+                    std::make_shared< AccelerationSettings >( cannon_ball_radiation_pressure ) );
 
         // Define origin of integration
         std::map< std::string, std::string > centralBodies;
@@ -434,23 +430,23 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
                     bodyMap, accelerationSettingsMap, centralBodies );
 
         // Create environment update settings.
-        boost::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
-                boost::make_shared< TranslationalStatePropagatorSettings< double > >(
+        std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
+                std::make_shared< TranslationalStatePropagatorSettings< double > >(
                     centralBodyList, accelerationsMap, propagatedBodyList, getInitialStateOfBody(
                         "Vehicle", centralBodies[ "Vehicle" ], bodyMap, initialTime ), finalTime );
         std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > environmentModelsToUpdate =
                 createEnvironmentUpdaterSettings< double >( propagatorSettings, bodyMap );
 
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.size( ), 3 );
-        BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_transational_state_update ), 1 );
-        BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_transational_state_update ).size( ), 1 );
+        BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_translational_state_update ), 1 );
+        BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_translational_state_update ).size( ), 1 );
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( radiation_pressure_interface_update ), 1 );
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( radiation_pressure_interface_update ).size( ), 1 );
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_mass_update ), 1 );
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_mass_update ).size( ), 1 );
 
 
-        boost::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
+        std::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
                 createEnvironmentUpdaterForDynamicalEquations< double, double >(
                     propagatorSettings, bodyMap );
 
@@ -470,17 +466,16 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
 
 
         updater->updateEnvironment(
-                    0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ),
-                    boost::assign::list_of( transational_state ) );
+                    0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ), { translational_state } );
     }
 
     {
         // Define settings for accelerations
         SelectedAccelerationMap accelerationSettingsMap;
         accelerationSettingsMap[ "Vehicle" ][ "Sun" ].push_back(
-                    boost::make_shared< AccelerationSettings >( cannon_ball_radiation_pressure ) );
+                    std::make_shared< AccelerationSettings >( cannon_ball_radiation_pressure ) );
         accelerationSettingsMap[ "Vehicle" ][ "Earth" ].push_back(
-                    boost::make_shared< AccelerationSettings >( aerodynamic ) );
+                    std::make_shared< AccelerationSettings >( aerodynamic ) );
 
         // Define origin of integration
         std::map< std::string, std::string > centralBodies;
@@ -496,18 +491,19 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
 
 
         // Define orientation angles.
-        boost::shared_ptr< aerodynamics::FlightConditions > vehicleFlightConditions =
-                bodyMap[ "Vehicle" ]->getFlightConditions( );
+        std::shared_ptr< aerodynamics::AtmosphericFlightConditions > vehicleFlightConditions =
+                std::dynamic_pointer_cast< aerodynamics::AtmosphericFlightConditions >(
+                    bodyMap[ "Vehicle" ]->getFlightConditions( ) );
         double angleOfAttack = 35.0 * mathematical_constants::PI / 180.0;
         double angleOfSideslip = -0.00322;
         double bankAngle = 2.323432;
         vehicleFlightConditions->getAerodynamicAngleCalculator( )->setOrientationAngleFunctions(
-                    boost::lambda::constant( angleOfAttack ),
-                    boost::lambda::constant( angleOfSideslip ),
-                    boost::lambda::constant( bankAngle ) );
+                    [ & ]( ){ return angleOfAttack; },
+                    [ & ]( ){ return angleOfSideslip; },
+                    [ & ]( ){ return bankAngle; } );
 
-        boost::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
-                boost::make_shared< TranslationalStatePropagatorSettings< double > >(
+        std::shared_ptr< SingleArcPropagatorSettings< double > > propagatorSettings =
+                std::make_shared< TranslationalStatePropagatorSettings< double > >(
                     centralBodyList, accelerationsMap, propagatedBodyList, getInitialStateOfBody(
                         "Vehicle", centralBodies[ "Vehicle" ], bodyMap, initialTime ), finalTime );
         std::map< propagators::EnvironmentModelsToUpdate, std::vector< std::string > > environmentModelsToUpdate =
@@ -515,8 +511,8 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
 
         // Test update settings
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.size( ), 5 );
-        BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_transational_state_update ), 1 );
-        BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_transational_state_update ).size( ), 2 );
+        BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_translational_state_update ), 1 );
+        BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( body_translational_state_update ).size( ), 2 );
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( radiation_pressure_interface_update ), 1 );
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( radiation_pressure_interface_update ).size( ), 1 );
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.count( body_mass_update ), 1 );
@@ -527,7 +523,7 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
         BOOST_CHECK_EQUAL( environmentModelsToUpdate.at( vehicle_flight_conditions_update ).size( ), 1 );
 
         // Create and call updater.
-        boost::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
+        std::shared_ptr< propagators::EnvironmentUpdater< double, double > > updater =
                 createEnvironmentUpdaterForDynamicalEquations< double, double >(
                     propagatorSettings, bodyMap );
         updater->updateEnvironment( testTime, integratedStateToSet );
@@ -570,7 +566,7 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
         BOOST_CHECK_EQUAL( vehicleFlightConditions->getCurrentTime( ), testTime );
 
         // Check if radiation pressure update is updated.
-        boost::shared_ptr< electro_magnetism::RadiationPressureInterface > radiationPressureInterface =
+        std::shared_ptr< electro_magnetism::RadiationPressureInterface > radiationPressureInterface =
                 bodyMap.at( "Vehicle" )->getRadiationPressureInterfaces( ).at( "Sun" );
         BOOST_CHECK_EQUAL(
                     ( radiationPressureInterface->getCurrentTime( ) == radiationPressureInterface->getCurrentTime( ) ), 1 );
@@ -583,8 +579,7 @@ BOOST_AUTO_TEST_CASE( test_NonConservativeForceEnvironmentUpdate )
                     std::numeric_limits< double >::epsilon( ) );
 
         updater->updateEnvironment(
-                    0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ),
-                    boost::assign::list_of( transational_state ) );
+                    0.5 * testTime, std::unordered_map< IntegratedStateType, Eigen::VectorXd >( ), { translational_state } );
 
 
     }

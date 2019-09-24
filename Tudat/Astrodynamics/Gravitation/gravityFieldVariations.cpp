@@ -46,18 +46,23 @@ void GravityFieldVariations::addSphericalHarmonicsCorrections(
     // Add corrections to existing values
     sineCoefficients.block( minimumDegree_, minimumOrder_, numberOfDegrees_, numberOfOrders_ )
             += correctionPair.second;
+    lastSineCorrection_.block( minimumDegree_, minimumOrder_, numberOfDegrees_, numberOfOrders_ )
+            = correctionPair.second;
+
     cosineCoefficients.block( minimumDegree_, minimumOrder_, numberOfDegrees_, numberOfOrders_ )
             += correctionPair.first;
+    lastCosineCorrection_.block( minimumDegree_, minimumOrder_, numberOfDegrees_, numberOfOrders_ )
+            = correctionPair.first;
 }
 
 //! Function to retrieve a variation object of given type (and name if necessary).
-std::pair< bool, boost::shared_ptr< gravitation::GravityFieldVariations > >
+std::pair< bool, std::shared_ptr< gravitation::GravityFieldVariations > >
 GravityFieldVariationsSet::getGravityFieldVariation(
         const BodyDeformationTypes deformationType,
         const std::string identifier )
 {
     // Declare return pointer.
-    boost::shared_ptr< gravitation::GravityFieldVariations > gravityFieldVariation;
+    std::shared_ptr< gravitation::GravityFieldVariations > gravityFieldVariation;
 
     // Check how many variation objects of request type are in list.
     int numberOfEntries =
@@ -88,7 +93,7 @@ GravityFieldVariationsSet::getGravityFieldVariation(
         {
             // Check if type and identifer match
             if( ( variationType_[ i ] == deformationType ) &&
-                    ( variationIdentifier_[ i ] == identifier ) )
+                    ( ( variationIdentifier_[ i ] == identifier ) || ( identifierPerType_.at( variationType_[ i ] ).size( ) == 1 ) ) )
             {
                 // Set return pointer and exit loop.
                 gravityFieldVariation = variationObjects_[ i ];
@@ -100,7 +105,7 @@ GravityFieldVariationsSet::getGravityFieldVariation(
         // Provide warning if no matches are found
         if( isCorrectIdentifierFound == 0 )
         {
-            std::string errorMessage = "Error when retrieving gravity field variation of typ " +
+            std::string errorMessage = "Error when retrieving gravity field variation of type " +
                     std::to_string( deformationType ) +
                     ", none of " +
                     std::to_string( numberOfEntries ) +
@@ -114,13 +119,13 @@ GravityFieldVariationsSet::getGravityFieldVariation(
 
 //! Function to create a function linearly interpolating the sine and cosine correction coefficients
 //! produced by an object of GravityFieldVariations type.
-boost::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) >
+std::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) >
 createInterpolatedSphericalHarmonicCorrectionFunctions(
-        boost::shared_ptr< GravityFieldVariations > variationObject,
+        std::shared_ptr< GravityFieldVariations > variationObject,
         const double initialTime,
         const double finalTime,
         const double timeStep,
-        const boost::shared_ptr< interpolators::InterpolatorSettings > interpolatorSettings )
+        const std::shared_ptr< interpolators::InterpolatorSettings > interpolatorSettings )
 {
     // Declare map of combined cosine and since corrections, to be filled and passed to interpolator
     std::map< double, Eigen::MatrixXd > cosineSineCorrectionsMap;
@@ -153,29 +158,29 @@ createInterpolatedSphericalHarmonicCorrectionFunctions(
 
 
     // Create interpolator
-    boost::shared_ptr< interpolators::OneDimensionalInterpolator< double, Eigen::MatrixXd > >
+    std::shared_ptr< interpolators::OneDimensionalInterpolator< double, Eigen::MatrixXd > >
             cosineSineCorrectionInterpolator =
             interpolators::createOneDimensionalInterpolator< double, Eigen::MatrixXd >(
                 cosineSineCorrectionsMap, interpolatorSettings );
 
     // Create pair interpolation interface for TimeDependentSphericalHarmonicsGravityField
-    boost::shared_ptr< PairInterpolationInterface > interpolationInterface =
-            boost::make_shared< PairInterpolationInterface >(
+    std::shared_ptr< PairInterpolationInterface > interpolationInterface =
+            std::make_shared< PairInterpolationInterface >(
                 cosineSineCorrectionInterpolator, variationObject->getMinimumDegree( ),
                 variationObject->getMinimumOrder( ),
                 variationObject->getNumberOfDegrees( ), variationObject->getNumberOfOrders( ) );
 
     // Create update function.
-    return boost::bind( &PairInterpolationInterface::getCosineSinePair,
-                        interpolationInterface, _1, _2, _3 );
+    return std::bind( &PairInterpolationInterface::getCosineSinePair,
+                        interpolationInterface, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 );
 }
 
 //! Class constructor.
 GravityFieldVariationsSet::GravityFieldVariationsSet(
-        const std::vector< boost::shared_ptr< GravityFieldVariations > > variationObjects,
+        const std::vector< std::shared_ptr< GravityFieldVariations > > variationObjects,
         const std::vector< BodyDeformationTypes > variationType,
         const std::vector< std::string > variationIdentifier,
-        const std::map< int, boost::shared_ptr< interpolators::InterpolatorSettings > >
+        const std::map< int, std::shared_ptr< interpolators::InterpolatorSettings > >
         createInterpolator,
         const std::map< int, double > initialTimes,
         const std::map< int, double > finalTimes,
@@ -195,8 +200,13 @@ GravityFieldVariationsSet::GravityFieldVariationsSet(
         throw std::runtime_error(  "Error when making GravityFieldVariationsSet, inconsistent input, type 2" );
     }
 
+    for( unsigned int i = 0; i < variationType_.size( ); i++ )
+    {
+        identifierPerType_[ variationType_.at( i ) ].push_back( variationIdentifier_.at( i ) );
+    }
+
     // Check if interpolation information is provided where required.
-    for( std::map< int, boost::shared_ptr< interpolators::InterpolatorSettings > >::iterator
+    for( std::map< int, std::shared_ptr< interpolators::InterpolatorSettings > >::iterator
          interpolatorSettingsIterator =
          createInterpolator_.begin( ); interpolatorSettingsIterator != createInterpolator_.end( );
          interpolatorSettingsIterator++ )
@@ -225,11 +235,11 @@ GravityFieldVariationsSet::GravityFieldVariationsSet(
 }
 
 //! Function to retrieve list of variation functions.
-std::vector< boost::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) > >
+std::vector< std::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) > >
 GravityFieldVariationsSet::getVariationFunctions( )
 {
     // Declare list
-    std::vector< boost::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) > >
+    std::vector< std::function< void( const double, Eigen::MatrixXd&, Eigen::MatrixXd& ) > >
             variationFunctions;
 
     // Iterate over all corrections and add correction function.
@@ -248,9 +258,9 @@ GravityFieldVariationsSet::getVariationFunctions( )
         else
         {
             variationFunctions.push_back(
-                        boost::bind(
+                        std::bind(
                             &GravityFieldVariations::addSphericalHarmonicsCorrections,
-                            variationObjects_[ i ], _1, _2, _3 ) );
+                            variationObjects_[ i ], std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 ) );
         }
     }
 
@@ -259,10 +269,10 @@ GravityFieldVariationsSet::getVariationFunctions( )
 }
 
 //! Function to retrieve the tidal gravity field variation with the specified bodies causing deformation
-boost::shared_ptr< GravityFieldVariations > GravityFieldVariationsSet::getDirectTidalGravityFieldVariation(
+std::shared_ptr< GravityFieldVariations > GravityFieldVariationsSet::getDirectTidalGravityFieldVariation(
         const std::vector< std::string >& namesOfBodiesCausingDeformation )
 {
-    boost::shared_ptr< GravityFieldVariations > gravityFieldVariation;
+    std::shared_ptr< GravityFieldVariations > gravityFieldVariation;
 
     // Check number of variation objects of correct type
     int numberOfBasicModels = std::count( variationType_.begin( ), variationType_.end( ), basic_solid_body );
@@ -274,11 +284,11 @@ boost::shared_ptr< GravityFieldVariations > GravityFieldVariationsSet::getDirect
         gravityFieldVariation = variationObjects_.at(
                     ( std::distance( variationType_.begin( ), std::find( variationType_.begin( ), variationType_.end( ),
                                                                          basic_solid_body ) ) ) );
-        boost::shared_ptr< BasicSolidBodyTideGravityFieldVariations > tidalGravityFieldVariation =
-                boost::dynamic_pointer_cast< BasicSolidBodyTideGravityFieldVariations >( gravityFieldVariation );
+        std::shared_ptr< BasicSolidBodyTideGravityFieldVariations > tidalGravityFieldVariation =
+                std::dynamic_pointer_cast< BasicSolidBodyTideGravityFieldVariations >( gravityFieldVariation );
 
         // Check consistency
-        if( tidalGravityFieldVariation == NULL )
+        if( tidalGravityFieldVariation == nullptr )
         {
             throw std::runtime_error( "Error when getting direct tidal gravity field variation, one model found, but type does not match" );
         }
@@ -313,11 +323,11 @@ boost::shared_ptr< GravityFieldVariations > GravityFieldVariationsSet::getDirect
         // Iterate over all objects and check consistency with input
         for( unsigned int i = 0; i < variationType_.size( ); i++ )
         {
-            if( boost::dynamic_pointer_cast< gravitation::BasicSolidBodyTideGravityFieldVariations >(
-                        variationObjects_.at( i ) ) != NULL )
+            if( std::dynamic_pointer_cast< gravitation::BasicSolidBodyTideGravityFieldVariations >(
+                        variationObjects_.at( i ) ) != nullptr )
             {
                 bool doBodiesMatch = utilities::doStlVectorContentsMatch(
-                            boost::dynamic_pointer_cast< gravitation::BasicSolidBodyTideGravityFieldVariations >(
+                            std::dynamic_pointer_cast< gravitation::BasicSolidBodyTideGravityFieldVariations >(
                                 variationObjects_.at( i ) )->getDeformingBodies( ), namesOfBodiesCausingDeformation );
 
                 if( doBodiesMatch )
@@ -339,9 +349,9 @@ boost::shared_ptr< GravityFieldVariations > GravityFieldVariationsSet::getDirect
 }
 
 //! Function to retrieve the tidal gravity field variations
-std::vector< boost::shared_ptr< GravityFieldVariations > > GravityFieldVariationsSet::getDirectTidalGravityFieldVariations( )
+std::vector< std::shared_ptr< GravityFieldVariations > > GravityFieldVariationsSet::getDirectTidalGravityFieldVariations( )
 {
-    std::vector< boost::shared_ptr< GravityFieldVariations > > directTidalVariations;
+    std::vector< std::shared_ptr< GravityFieldVariations > > directTidalVariations;
 
     // Iterate over variation objects and check type
     for( unsigned int i = 0; i < variationType_.size( ); i++ )
